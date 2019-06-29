@@ -1,0 +1,17 @@
+{
+  "mud": {
+    "name": "",
+    "variant": "mush",
+    "host": "",
+    "port": "",
+    "username": "",
+    "password": ""
+  },
+  "registrationPath": "mud-registration.yaml",
+  "port": 8090,
+  "bridge": {
+    "homeserverUrl": "https://your-home-server.example.org",
+    "domain": "example.org",
+    "registration": "mud-registration.yaml"
+  }
+}

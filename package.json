@@ -1,0 +1,23 @@
+{
+  "name": "matrix-puppet-mud",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "DEBUG=*matrix-puppet:* node index.js",
+    "test": "echo \"no tests at this time\"; exit 1"
+  },
+  "keywords": [
+    "matrix",
+    "mud"
+  ],
+  "contributors": [
+    "Chris Newton"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.4.7",
+    "matrix-puppet-bridge": "^1.15.4"
+  },
+  "devDependencies": {}
+}
