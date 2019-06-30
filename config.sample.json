@@ -7,6 +7,8 @@
     "username": "",
     "password": ""
   },
+  "serviceName": "MUD",
+  "servicePrefix": "mud",
   "registrationPath": "mud-registration.yaml",
   "port": 8090,
   "bridge": {

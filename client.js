@@ -9,11 +9,14 @@ const resolveData = ({data:{response}}) => {
     return Promise.resolve(response);
 };
 
+var zip = (a,b) => a.map((x,i) => [x,b[i]]);
+
 const State = {
     CONNECTING: "connecting",
     CONNECTED: "connected",
     WHO_START: "who_start",
-    WHO_IN: "who_in"
+    WHO_IN: "who_in",
+    WHO_DB: "who_db"
 };
 
 class Client extends EventEmitter {
@@ -23,9 +26,12 @@ class Client extends EventEmitter {
         this.socket = null;
         this.state = State.CONNECTING;
         this.players = {};
+        this.players_ordered = [];
+        this.my_dbnum = null;
         this.connect_rx = RegExp(".*connects you to an existing character\\..*");
         this.who_start_rx = RegExp("^Player Name.*");
         this.who_stop_rx = RegExp("^\\d+ Players logged in,.*");
+        this.who_db_rx = /^--__LWHO__-- (.*)$/;
         this.person_speaks_rx = /^(.*) says, \"(.*)\"$/;
     }
     connect() {
@@ -50,14 +56,31 @@ class Client extends EventEmitter {
             }
             if (this.state == State.WHO_IN) {
                 if (this.who_stop_rx.test(line)) {
-                    console.log("Done with WHO. Players are:", this.players);
-                    this.state = State.CONNECTED;
+                    this.state = State.WHO_DB;
+                    this.socket.write("@pemit me=--__LWHO__-- [lwho()]\n");
                     return;
                 }
                 var name = line.split(" ")[0];
-                if (this.players.name == undefined) {
+                if (!this.players.hasOwnProperty(name)) {
                     console.log(`Adding person: ${name}`);
                     this.players[name] = {};
+                    this.players_ordered.push(name);
+                }
+            }
+            if (this.state == State.WHO_DB) {
+                if (this.who_db_rx.test(line)) {
+                    let matches = Array.from(line.match(this.who_db_rx));
+                    let dbnums = Array.from(matches[1].split(" "));
+                    for (let [name, dbnum] of zip(this.players_ordered, dbnums)) {
+                        this.players[name].dbnum = dbnum;
+                        if (name == this.config.mud.username) {
+                            this.my_dbnum = dbnum;
+                            console.log(`My dbnum is ${this.my_dbnum
+}`);
+                        }
+                    }
+                    this.state = State.CONNECTED;
+                    console.log("Done with WHO. Players are:", this.players);
                 }
             }
             if (this.state == State.CONNECTED) {
@@ -68,19 +91,21 @@ class Client extends EventEmitter {
                 if (this.person_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_speaks_rx));
                     console.log(matches);
+                    // let the_id = this.players[matches[1]].dbnum;
+                    let the_id = matches[1];
                     let msg = {
                         'status': 'success',
                         'type': 'message',
                         'content': matches[2],
-                        'attachments': null,
+                        'attachments': [],
                         'conversation_id': this.config.mud.name,
                         'conversation_name': this.config.mud.name,
                         'photo_url': null,
                         'user': matches[1],
-                        'self_user_id': matches[1],
-                        'user_id': {'chat_id': matches[1]}
+                        'self_user_id': this.my_dbnum,
+                        'user_id': {'chat_id': the_id, 'gaia_id': the_id}
                     };
-                    console.log("Sending message:", msg);
+                    console.log("Sending message to Matrix:", msg);
                     this.emit("message", msg);
                 }
             }

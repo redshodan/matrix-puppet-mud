@@ -14,10 +14,10 @@ const debugVerbose = debug('verbose:matrix-puppet:mud:index');
 
 class App extends MatrixPuppetBridgeBase {
     getServicePrefix() {
-        return "mud";
+        return config.servicePrefix;
     }
     getServiceName() {
-        return "MUD";
+        return config.serviceName;
     }
     defaultDeduplicationTag() {
         return " \u200b"; // Unicode Character 'ZERO WIDTH SPACE'
@@ -91,20 +91,20 @@ class App extends MatrixPuppetBridgeBase {
     }
     sendImageMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
                                                    _matrixEvent) {
+        console.log("sendImageMessageAsPuppetToThirdPartyRoomWithId");
         // Nothing to do for a MUD with this
-        return Promise.resolve();
+        // return Promise.resolve();
     }
     sendFileMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
                                                   _matrixEvent) {
+        console.log("sendFileMessageAsPuppetToThirdPartyRoomWithId");
         // Nothing to do for a MUD with this
-        return Promise.resolve();
+        // return Promise.resolve();
     }
     sendReadReceiptAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId) {
+        console.log("sendReadReceiptAsPuppetToThirdPartyRoomWithId");
         // Nothing to do for a MUD with this
-        return Promise.resolve();
-    }
-    getThirdPartyRoomDataById(_thirdPartyRoomId) {
-        return {"name": this.config.name, "topic": ""};
+        // return Promise.resolve();
     }
 }
 
@@ -117,8 +117,8 @@ new Cli({
             reg.setHomeserverToken(AppServiceRegistration.generateToken());
             reg.setAppServiceToken(AppServiceRegistration.generateToken());
             reg.setSenderLocalpart("mudbot");
-            reg.addRegexPattern("users", "@mud_.*", true);
-            reg.addRegexPattern("aliases", "#mud_.*", true);
+            reg.addRegexPattern("users", `@${config.servicePrefix}_.*`, true);
+            reg.addRegexPattern("aliases", `#${config.servicePrefix}_.*`, true);
             callback(reg);
         }).catch(err=>{
             console.trace();
