@@ -85,6 +85,7 @@ class Client extends EventEmitter {
                     }
                     this.state = State.CONNECTED;
                     console.log("Done with WHO. Players are:", this.players);
+                    this.sendMatrixNotice(`Connected to ${this.config.mud.name}`);
                     return;
                 }
                 console.log(`Skipping this line in WHO_DB state: ${line}`);
@@ -101,59 +102,22 @@ class Client extends EventEmitter {
                 if (this.person_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_speaks_rx));
                     let mud_user = matches[1];
-                    let body = matches[2];
-                    let html = null;
-                    if (!this.players.hasOwnProperty(mud_user)) {
-                        mud_user = this.config.mud.name;
-                        body = line;
-                        html = `<pre><code>${line}</code></pre>`;
-                    }
-                    let msg = {
-                        'status': 'success',
-                        'type': 'message',
-                        'content': body,
-                        'html': html,
-                        'msgtype': "m.text",
-                        'attachments': [],
-                        'conversation_id': this.config.mud.name,
-                        'conversation_name': this.config.mud.name,
-                        'photo_url': null,
-                        'user': mud_user,
-                        // 'self_user_id': this.my_dbnum,
-                        'self_user_id': this.config.puppet.id,
-                        'user_id': {'chat_id': mud_user, 'gaia_id': mud_user}
-                    };
-                    console.log("Sending message to Matrix:", msg);
-                    this.emit("message", msg);
+                    if (this.players.hasOwnProperty(mud_user))
+                        this.sendMatrixMessage(matches[2], null, "m.text", null,
+                                               mud_user);
+                    else
+                        this.sendMatrixBlock(line);
                     return;
                 }
                 /// Action: <person> pose
                 if (this.person_poses_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_poses_rx));
                     let mud_user = matches[1];
-                    let body = matches[2];
-                    let html = null;
-                    if (!this.players.hasOwnProperty(mud_user)) {
-                        mud_user = this.config.mud.name;
-                        body = line;
-                        html = `<pre><code>${line}</code></pre>`;
-                    }
-                    let msg = {
-                        'status': 'success',
-                        'type': 'message',
-                        'content': body,
-                        'html': html,
-                        'msgtype': "m.emote",
-                        'attachments': [],
-                        'conversation_id': this.config.mud.name,
-                        'conversation_name': this.config.mud.name,
-                        'photo_url': null,
-                        'user': mud_user,
-                        'self_user_id': this.config.puppet.id,
-                        'user_id': {'chat_id': mud_user, 'gaia_id': mud_user}
-                    };
-                    console.log("Sending message to Matrix:", msg);
-                    this.emit("message", msg);
+                    if (this.players.hasOwnProperty(mud_user))
+                        this.sendMatrixMessage(matches[2], null, "m.emote", null,
+                                               mud_user);
+                    else
+                        this.sendMatrixBlock(line);
                     return;
                 }
             }
@@ -170,6 +134,38 @@ class Client extends EventEmitter {
         this.socket.connect(this.config.mud.port, this.config.mud.host);
 
         debugVerbose('Connected to:', this.config.mud.host);
+    }
+
+    sendMatrixMessage(body, html=undefined, msgtype="m.text", convo=undefined,
+                      mud_user=undefined, self_id=undefined) {
+        convo = convo || this.config.mud.name;
+        mud_user = mud_user || this.config.mud.name;
+        self_id = self_id || this.config.puppet.id;
+        let msg = {
+            'status': 'success',
+            'type': 'message',
+            'content': body,
+            'html': html,
+            'msgtype': msgtype,
+            'attachments': [],
+            'conversation_id': convo,
+            'conversation_name': convo,
+            'photo_url': null,
+            'user': mud_user,
+            'self_user_id': self_id,
+            'user_id': {'chat_id': mud_user, 'gaia_id': mud_user}
+        };
+        console.log("Sending message to Matrix:", msg);
+        this.emit("message", msg);
+    }
+
+    sendMatrixNotice(body) {
+        this.sendMatrixMessage(body, `<h1>${body}</h1>`, "m.notice");
+    }
+
+    sendMatrixBlock(body, msgtype="m.text") {
+        this.sendMatrixMessage(body, `<pre><code>${body}</code></pre>`,
+                               msgtype);
     }
 
     sendPlayerSetup() {
