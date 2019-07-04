@@ -33,6 +33,7 @@ class Client extends EventEmitter {
         this.who_stop_rx = RegExp("^\\d+ Players logged in,.*");
         this.who_db_rx = /^--__LWHO__-- (.*)$/;
         this.person_speaks_rx = /^(.*) says, \"(.*)\"$/;
+        this.person_poses_rx = /^(.*) (.*)$/;
     }
     connect() {
         debugVerbose("Connecting...");
@@ -43,6 +44,7 @@ class Client extends EventEmitter {
         this.rl.on('line', (line) => {
             console.log(`Line from MUD: ${line}`);
 
+            /// State: CONNECTING
             if (this.state == State.CONNECTING && this.connect_rx.test(line)) {
                 this.socket.write("connect " + this.config.mud.username + " " +
                                   this.config.mud.password + "\n");
@@ -50,10 +52,12 @@ class Client extends EventEmitter {
                 this.sendWHO();
                 return;
             }
+            /// State: WHO_START
             if (this.state == State.WHO_START && this.who_start_rx.test(line)) {
                 this.state = State.WHO_IN;
                 return;
             }
+            /// State: WHO_IN
             if (this.state == State.WHO_IN) {
                 if (this.who_stop_rx.test(line)) {
                     this.state = State.WHO_DB;
@@ -66,7 +70,9 @@ class Client extends EventEmitter {
                     this.players[name] = {};
                     this.players_ordered.push(name);
                 }
+                return;
             }
+            /// State: WHO_DB
             if (this.state == State.WHO_DB) {
                 if (this.who_db_rx.test(line)) {
                     let matches = Array.from(line.match(this.who_db_rx));
@@ -75,38 +81,80 @@ class Client extends EventEmitter {
                         this.players[name].dbnum = dbnum;
                         if (name == this.config.mud.username) {
                             this.my_dbnum = dbnum;
-                            console.log(`My dbnum is ${this.my_dbnum
-}`);
                         }
                     }
                     this.state = State.CONNECTED;
                     console.log("Done with WHO. Players are:", this.players);
+                    return;
                 }
+                console.log(`Skipping this line in WHO_DB state: ${line}`);
+                return;
             }
+            /// State: CONNECTED
             if (this.state == State.CONNECTED) {
+                /// Action: self say
                 if (line.startsWith("You say, ")) {
                     console.log("Skipping my own line");
                     return;
                 }
+                /// Action: <person> say
                 if (this.person_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_speaks_rx));
-                    console.log(matches);
-                    // let the_id = this.players[matches[1]].dbnum;
-                    let the_id = matches[1];
+                    let mud_user = matches[1];
+                    let body = matches[2];
+                    let html = null;
+                    if (!this.players.hasOwnProperty(mud_user)) {
+                        mud_user = this.config.mud.name;
+                        body = line;
+                        html = `<pre><code>${line}</code></pre>`;
+                    }
                     let msg = {
                         'status': 'success',
                         'type': 'message',
-                        'content': matches[2],
+                        'content': body,
+                        'html': html,
+                        'msgtype': "m.text",
                         'attachments': [],
                         'conversation_id': this.config.mud.name,
                         'conversation_name': this.config.mud.name,
                         'photo_url': null,
-                        'user': matches[1],
-                        'self_user_id': this.my_dbnum,
-                        'user_id': {'chat_id': the_id, 'gaia_id': the_id}
+                        'user': mud_user,
+                        // 'self_user_id': this.my_dbnum,
+                        'self_user_id': this.config.puppet.id,
+                        'user_id': {'chat_id': mud_user, 'gaia_id': mud_user}
                     };
                     console.log("Sending message to Matrix:", msg);
                     this.emit("message", msg);
+                    return;
+                }
+                /// Action: <person> pose
+                if (this.person_poses_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_poses_rx));
+                    let mud_user = matches[1];
+                    let body = matches[2];
+                    let html = null;
+                    if (!this.players.hasOwnProperty(mud_user)) {
+                        mud_user = this.config.mud.name;
+                        body = line;
+                        html = `<pre><code>${line}</code></pre>`;
+                    }
+                    let msg = {
+                        'status': 'success',
+                        'type': 'message',
+                        'content': body,
+                        'html': html,
+                        'msgtype': "m.emote",
+                        'attachments': [],
+                        'conversation_id': this.config.mud.name,
+                        'conversation_name': this.config.mud.name,
+                        'photo_url': null,
+                        'user': mud_user,
+                        'self_user_id': this.config.puppet.id,
+                        'user_id': {'chat_id': mud_user, 'gaia_id': mud_user}
+                    };
+                    console.log("Sending message to Matrix:", msg);
+                    this.emit("message", msg);
+                    return;
                 }
             }
         });
@@ -136,10 +184,10 @@ class Client extends EventEmitter {
     }
 
     send(id, msg) {
-        debugVerbose("client.send:", ie, msg);
+        console.log("client.send:", ie, msg);
         let themsg = { 'cmd': "sendmessage", 'conversation_id':id,
                        'msgbody': msg };
-        debugVerbose('sending message to MUD', JSON.stringify(themsg));
+        console.log('sending message to MUD', JSON.stringify(themsg));
         this.socket.write(JSON.stringify(themsg) + "\n");
         return Promise.resolve();
     }

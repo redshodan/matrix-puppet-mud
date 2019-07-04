@@ -3,7 +3,8 @@ const {
         Cli, AppServiceRegistration
     },
     Puppet,
-    MatrixPuppetBridgeBase
+    MatrixPuppetBridgeBase,
+    utils
 } = require("matrix-puppet-bridge");
 const MUDClient = require('./client');
 const config = require('./config.json');
@@ -36,7 +37,7 @@ class App extends MatrixPuppetBridgeBase {
         });
 
         this.client.on('message', (data)=> {
-            if(data && data.type === 'message')
+            if (data && data.type === 'message')
             {
                 try {
                     this.threadInfo[data.conversation_id] = {
@@ -48,19 +49,21 @@ class App extends MatrixPuppetBridgeBase {
                         roomId: data.conversation_id,
                         senderName: data.user,
                         senderId: isMe ? undefined : data.user_id.chat_id,
-                        text: data.content,
                         avatarUrl: data.photo_url,
+                        text: data.content,
+                        html: data.html,
+                        msgtype: data.msgtype
                     };
                     return this.handleThirdPartyRoomMessage(payload).catch(
                         err => {
                             console.log(
                                 "handleThirdPartyRoomMessage error", err);
-                            sendStatusMsg(
+                            this.sendStatusMsg(
                                 {}, "handleThirdPartyRoomMessage error", err);
                         });
                 } catch(er) {
                     console.log("incoming message handling error:", er);
-                    sendStatusMsg({}, "incoming message handling error:", err);
+                    this.sendStatusMsg({}, "incoming message handling error:", err);
                 }
             }
 
@@ -78,19 +81,76 @@ class App extends MatrixPuppetBridgeBase {
 
         return this.client;
     }
+
+    // Override to make msgtype settable
+    handleThirdPartyRoomMessage(thirdPartyRoomMessageData) {
+        console.log('handling third party room message', thirdPartyRoomMessageData);
+        let {
+            roomId,
+            senderName,
+            senderId,
+            avatarUrl,
+            text,
+            html,
+            msgtype
+        } = thirdPartyRoomMessageData;
+
+        msgtype = msgtype || "m.txt";
+
+        return this.getOrCreateMatrixRoomFromThirdPartyRoomId(roomId).then((matrixRoomId) => {
+            return this.getUserClient(matrixRoomId, senderId, senderName, avatarUrl).then((client) => {
+                if (senderId === undefined) {
+                    console.log("this message was sent by me, but did it come from a matrix client or a 3rd party client?");
+                    console.log("if it came from a 3rd party client, we want to repeat it as a 'notice' type message");
+                    console.log("if it came from a matrix client, then it's already in the client, sending again would dupe");
+                    console.log("we use a tag on the end of messages to determine if it came from matrix");
+
+                    if (this.isTaggedMatrixMessage(text)) {
+                        console.log('it is from matrix, so just ignore it.');
+                        return;
+                    } else {
+                        console.log('it is from 3rd party client');
+                    }
+                }
+
+                let tag = utils.autoTagger(senderId, this);
+
+                if (html) {
+                    return client.sendMessage(matrixRoomId, {
+                        body: tag(text),
+                        formatted_body: html,
+                        format: "org.matrix.custom.html",
+                        msgtype: msgtype
+                    });
+                } else {
+                    return client.sendMessage(matrixRoomId, {
+                        body: tag(text),
+                        msgtype: msgtype
+                    });
+                }
+            });
+        });
+            // .catch(err=>{
+            // super().sendStatusMsg({}, 'Error in '+this.handleThirdPartyRoomMessage.name, err, thirdPartyRoomMessageData);
+        // });
+    }
+
     getThirdPartyRoomDataById(id) {
         debugVerbose("getThirdPartyRoomDataById()", id)
         let roomData = {
             name: this.threadInfo[id].conversation_name,
-            topic: "MUD Chat"
+            topic: `${config.serviceName} Chat`
         };
         return roomData;
+    }
+    sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
+        // no op for a MUD
     }
     sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
         return this.client.send(id, text);
     }
-    sendImageMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
-                                                   _matrixEvent) {
+    sendImageMessageAsPuppetToThirdPartyRoomWithId(
+        _thirdPartyRoomId, _data, _matrixEvent) {
         console.log("sendImageMessageAsPuppetToThirdPartyRoomWithId");
         // Nothing to do for a MUD with this
         // return Promise.resolve();
