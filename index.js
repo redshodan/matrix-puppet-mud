@@ -12,8 +12,6 @@ const path = require('path');
 const debug = require('debug');
 const debugVerbose = debug('verbose:matrix-puppet:mud:index');
 
-const dedup = " \u200b"; // Unicode Character 'ZERO WIDTH SPACE'
-
 
 class App extends MatrixPuppetBridgeBase {
     getServicePrefix() {
@@ -23,7 +21,7 @@ class App extends MatrixPuppetBridgeBase {
         return config.serviceName;
     }
     defaultDeduplicationTag() {
-        return dedup; // Unicode Character 'ZERO WIDTH SPACE'
+        return " \u200b"; // Unicode Character 'ZERO WIDTH SPACE'
     }
     defaultDeduplicationTagPattern() {
         return "\\u200b$"; // Unicode Character 'ZERO WIDTH SPACE'
@@ -31,7 +29,8 @@ class App extends MatrixPuppetBridgeBase {
     initThirdPartyClient() {
         this.threadInfo = {};
         this.userId = null;
-        this.client = new MUDClient(config, config.users.bobbit, dedup)
+        this.client = new MUDClient(config, config.users.bobbit,
+                                    this.defaultDeduplicationTag())
         this.client.connect();
 
         this.client.on('status', (statusTxt)=> {
