@@ -20,9 +20,11 @@ const State = {
 };
 
 class Client extends EventEmitter {
-    constructor(config) {
+    constructor(config, userCfg, dedup) {
         super();
         this.config = config;
+        this.userCfg = userCfg
+        this.dedup = dedup;
         this.socket = null;
         this.state = State.CONNECTING;
         this.players = {};
@@ -46,8 +48,8 @@ class Client extends EventEmitter {
 
             /// State: CONNECTING
             if (this.state == State.CONNECTING && this.connect_rx.test(line)) {
-                this.socket.write("connect " + this.config.mud.username + " " +
-                                  this.config.mud.password + "\n");
+                this.socket.write("connect " + this.userCfg.mud.username + " " +
+                                  this.userCfg.mud.password + "\n");
                 this.sendPlayerSetup();
                 this.sendWHO();
                 return;
@@ -79,7 +81,7 @@ class Client extends EventEmitter {
                     let dbnums = Array.from(matches[1].split(" "));
                     for (let [name, dbnum] of zip(this.players_ordered, dbnums)) {
                         this.players[name].dbnum = dbnum;
-                        if (name == this.config.mud.username) {
+                        if (name == this.userCfg.mud.username) {
                             this.my_dbnum = dbnum;
                         }
                     }
@@ -140,7 +142,7 @@ class Client extends EventEmitter {
                       mud_user=undefined, self_id=undefined) {
         convo = convo || this.config.mud.name;
         mud_user = mud_user || this.config.mud.name;
-        self_id = self_id || this.config.puppet.id;
+        self_id = self_id || this.config.users.bobbit.id;
         let msg = {
             'status': 'success',
             'type': 'message',
@@ -153,7 +155,7 @@ class Client extends EventEmitter {
             'photo_url': null,
             'user': mud_user,
             'self_user_id': self_id,
-            'user_id': {'chat_id': mud_user, 'gaia_id': mud_user}
+            'user_id': mud_user
         };
         console.log("Sending message to Matrix:", msg);
         this.emit("message", msg);
@@ -180,11 +182,13 @@ class Client extends EventEmitter {
     }
 
     send(id, msg) {
-        console.log("client.send:", ie, msg);
-        let themsg = { 'cmd': "sendmessage", 'conversation_id':id,
-                       'msgbody': msg };
-        console.log('sending message to MUD', JSON.stringify(themsg));
-        this.socket.write(JSON.stringify(themsg) + "\n");
+        if (msg.endsWith(this.dedup))
+            msg = msg.slice(0, msg.length - 2);
+        console.log("client.send:", id, msg);
+        // let themsg = { 'cmd': "sendmessage", 'conversation_id':id,
+        //                'msgbody': msg };
+        // console.log('sending message to MUD', JSON.stringify(themsg));
+        this.socket.write('"' + msg + "\n");
         return Promise.resolve();
     }
 }

@@ -1,0 +1,21 @@
+version: '3'
+
+networks:
+    matrix:
+        external: true
+
+services:
+    matrix-puppet-mud:
+        image: matrix-puppet-mud
+        container_name: matrix-puppet-mud
+        restart: "no"
+        environment:
+            - DEBUG=*matrix-puppet*
+        networks:
+            - matrix
+        volumes:
+            - ./index.js:/mud/index.js
+            - ./client.js:/mud/client.js
+            - ./puppet.js:/mud/puppet.js
+            - ./mud-config.json:/mud/config.json
+            - ./mud-registration.yaml:/mud/mud-registration.yaml
