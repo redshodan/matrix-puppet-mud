@@ -39,39 +39,21 @@ class App extends MatrixPuppetBridgeBase {
         });
 
         this.client.on('message', (data)=> {
-            if (data && data.type === 'message')
-            {
-                try {
-                    this.threadInfo[data.conversation_id] = {
-                        conversation_name: data.conversation_name,
-                    };
-                    const isMe = data.user_id === data.self_user_id;
-                    const payload = {
-                        roomId: data.conversation_id,
-                        senderName: data.user,
-                        senderId: isMe ? undefined : data.user_id,
-                        avatarUrl: data.photo_url,
-                        text: data.content,
-                        html: data.html,
-                        msgtype: data.msgtype
-                    };
-                    return this.handleThirdPartyRoomMessage(payload).catch(
-                        err => {
-                            console.log(
-                                "handleThirdPartyRoomMessage error", err);
-                            this.sendStatusMsg(
-                                {}, "handleThirdPartyRoomMessage error", err);
-                        });
-                } catch(er) {
-                    console.log("incoming message handling error:", er);
-                    this.sendStatusMsg({}, "incoming message handling error:", err);
-                }
+            try {
+                this.threadInfo[data.conversation_id] = {
+                    conversation_name: data.conversation_name,
+                };
+                return this.handleThirdPartyRoomMessage(data);
+            } catch(er) {
+                console.log("incoming message handling error:", er);
+                this.sendStatusMsg({}, "incoming message handling error:", err);
             }
         });
 
         return this.client;
     }
 
+    // Override to map to the right matrix client
     getUserClient(roomId, senderId, senderName, avatarUrl, doNotTryToGetRemoteUserStoreData) {
         console.log("getUserClient", senderId, senderName);
         if (senderId === undefined)
@@ -138,6 +120,7 @@ class App extends MatrixPuppetBridgeBase {
         // });
     }
 
+    // Override to not send warning message that can cause a message loop
     handleMatrixMessageEvent(data) {
         const { room_id, content: { body, msgtype } } = data;
         const thirdPartyRoomId = this.getThirdPartyRoomIdFromMatrixRoomId(room_id);
@@ -147,7 +130,7 @@ class App extends MatrixPuppetBridgeBase {
             return;
         } else if (isStatusRoom) {
             // Sometimes the base class sends a warning which can trigger a
-            // messge loop. so just don't do that nonsense.
+            // message loop. so just don't do that nonsense.
             return;
         }
 
@@ -165,7 +148,7 @@ class App extends MatrixPuppetBridgeBase {
     sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
         // no op for a MUD
     }
-    sendMessageAsPuppetToThirdPartyRoomWithId(id, text) {
+    sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
         return this.client.send(id, text);
     }
     sendImageMessageAsPuppetToThirdPartyRoomWithId(

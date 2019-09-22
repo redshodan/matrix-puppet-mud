@@ -143,22 +143,17 @@ class Client extends EventEmitter {
         convo = convo || this.config.mud.name;
         mud_user = mud_user || this.config.mud.name;
         self_id = self_id || this.config.users.bobbit.id;
-        let msg = {
-            'status': 'success',
-            'type': 'message',
-            'content': body,
-            'html': html,
-            'msgtype': msgtype,
-            'attachments': [],
-            'conversation_id': convo,
-            'conversation_name': convo,
-            'photo_url': null,
-            'user': mud_user,
-            'self_user_id': self_id,
-            'user_id': mud_user
-        };
-        console.log("Sending message to Matrix:", msg);
-        this.emit("message", msg);
+        this.emit("message", {
+            roomId: convo,
+            senderName: mud_user,
+            senderId: mud_user == self_id ? undefined : mud_user,
+            avatarUrl: null,
+            text: body,
+            html: html,
+            msgtype: msgtype,
+            conversation_id: convo,
+            conversation_name: convo
+        });
     }
 
     sendMatrixNotice(body) {
@@ -184,10 +179,6 @@ class Client extends EventEmitter {
     send(id, msg) {
         if (msg.endsWith(this.dedup))
             msg = msg.slice(0, msg.length - 2);
-        console.log("client.send:", id, msg);
-        // let themsg = { 'cmd': "sendmessage", 'conversation_id':id,
-        //                'msgbody': msg };
-        // console.log('sending message to MUD', JSON.stringify(themsg));
         this.socket.write('"' + msg + "\n");
         return Promise.resolve();
     }
