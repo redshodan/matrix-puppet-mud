@@ -148,6 +148,10 @@ class App extends MatrixPuppetBridgeBase {
         // no op for a MUD
     }
     sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
+        if (text.endsWith(this.defaultDeduplicationTag())) {
+            console.log("Dropping dedupped message from Matrix");
+            return Promise.resolve();
+        }
         return this.client.send(id, text);
     }
     sendImageMessageAsPuppetToThirdPartyRoomWithId(

@@ -34,8 +34,9 @@ class Client extends EventEmitter {
         this.who_start_rx = RegExp("^Player Name.*");
         this.who_stop_rx = RegExp("^\\d+ Players logged in,.*");
         this.who_db_rx = /^--__LWHO__-- (.*)$/;
-        this.person_speaks_rx = /^(.*) says, \"(.*)\"$/;
-        this.person_poses_rx = /^(.*) (.*)$/;
+        this.person_speaks_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
+        this.person_poses_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
+        this.person_action_rx = /^\[([\w ]+)\(#(\d+)\)\] (.*)$/;
     }
     connect() {
         debugVerbose("Connecting...");
@@ -103,9 +104,10 @@ class Client extends EventEmitter {
                 /// Action: <person> say
                 if (this.person_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_speaks_rx));
+                    console.log(`SAY SAY SAY: ${matches}`);
                     let mud_user = matches[1];
                     if (this.players.hasOwnProperty(mud_user))
-                        this.sendMatrixMessage(matches[2], null, "m.text", null,
+                        this.sendMatrixMessage(matches[4], null, "m.text", null,
                                                mud_user);
                     else
                         this.sendMatrixBlock(line);
@@ -114,14 +116,29 @@ class Client extends EventEmitter {
                 /// Action: <person> pose
                 if (this.person_poses_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_poses_rx));
+                    console.log(`POSE POSE POSE: ${matches}`);
                     let mud_user = matches[1];
                     if (this.players.hasOwnProperty(mud_user))
-                        this.sendMatrixMessage(matches[2], null, "m.emote", null,
+                        this.sendMatrixMessage(matches[3], null, "m.emote", null,
                                                mud_user);
                     else
                         this.sendMatrixBlock(line);
                     return;
                 }
+                /// Action: General person's action
+                if (this.person_action_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_action_rx));
+                    console.log(`ACTION ACTION ACTION: ${matches}`);
+                    let mud_user = matches[1];
+                    if (this.players.hasOwnProperty(mud_user))
+                        this.sendMatrixMessage(matches[3], null, "m.emote", null,
+                                               mud_user);
+                    else
+                        this.sendMatrixBlock(line);
+                    return;
+                }
+
+                this.sendMatrixBlock(line);
             }
         });
 
@@ -166,7 +183,7 @@ class Client extends EventEmitter {
     }
 
     sendPlayerSetup() {
-        // this.socket.write("set me=nospoof\n");
+        this.socket.write("@set me=nospoof\n");
     }
 
     sendWHO() {
