@@ -11,6 +11,7 @@ const config = require('./config.json');
 const path = require('path');
 const debug = require('debug');
 const debugVerbose = debug('verbose:matrix-puppet:mud:index');
+const mudUtils = require('./utils.js');
 
 
 class App extends MatrixPuppetBridgeBase {
@@ -24,32 +25,36 @@ class App extends MatrixPuppetBridgeBase {
         return " \u200b"; // Unicode Character 'ZERO WIDTH SPACE'
     }
     defaultDeduplicationTagPattern() {
-        return "\\u200b$"; // Unicode Character 'ZERO WIDTH SPACE'
+        return " \\u200b$"; // Unicode Character 'ZERO WIDTH SPACE'
     }
     initThirdPartyClient() {
         this.threadInfo = {};
         this.userId = null;
-        this.client = new MUDClient(config, config.users.bobbit,
-                                    this.defaultDeduplicationTag())
-        this.client.connect();
+        this.clients = [];
+        for (let uname in config.users) {
+            let client = new MUDClient(config, config.users[uname],
+                                       this.defaultDeduplicationTag(),
+                                       uname == mainUname);
+            config.users[uname].mudclient = client;
+            this.clients.push(client);
+            client.connect();
 
-        this.client.on('status', (statusTxt)=> {
-            this.sendStatusMsg({}, statusTxt);
-        });
+            client.on('status', (statusTxt)=> {
+                this.sendStatusMsg({}, statusTxt);
+            });
 
-        this.client.on('message', (data)=> {
-            try {
-                this.threadInfo[data.conversation_id] = {
-                    conversation_name: data.conversation_name,
-                };
-                return this.handleThirdPartyRoomMessage(data);
-            } catch(er) {
-                console.log("incoming message handling error:", er);
-                this.sendStatusMsg({}, "incoming message handling error:", err);
-            }
-        });
-
-        return this.client;
+            client.on('message', (data)=> {
+                try {
+                    this.threadInfo[data.conversation_id] = {
+                        conversation_name: data.conversation_name,
+                    };
+                    return this.handleThirdPartyRoomMessage(data);
+                } catch(er) {
+                    console.log("incoming message handling error:", er);
+                    this.sendStatusMsg({}, "incoming message handling error:", err);
+                }
+            });
+        }
     }
 
     // Override to map to the right matrix client
@@ -59,7 +64,7 @@ class App extends MatrixPuppetBridgeBase {
             return Promise.resolve(this.puppet.getClient());
         else if (senderId in config.users) {
             const user = config.users[senderId];
-            return Promise.resolve(user.mxcli.getClient());
+            return Promise.resolve(user.mxclient.getClient());
         }
         else
             return super.getUserClient(roomId, senderId, senderName, avatarUrl,
@@ -119,7 +124,8 @@ class App extends MatrixPuppetBridgeBase {
         // });
     }
 
-    // Override to not send warning message that can cause a message loop
+    // Override to not send warning message that can cause a message loop and
+    // add in m.emote support
     handleMatrixMessageEvent(data) {
         const { room_id, content: { body, msgtype } } = data;
         const thirdPartyRoomId = this.getThirdPartyRoomIdFromMatrixRoomId(room_id);
@@ -131,8 +137,14 @@ class App extends MatrixPuppetBridgeBase {
             // Sometimes the base class sends a warning which can trigger a
             // message loop. so just don't do that nonsense.
             return;
+        } else {
+            if (msgtype === 'm.emote') {
+                promise = () => this.sendEmoteAsPuppetToThirdPartyRoomWithId(thirdPartyRoomId, msg, data);
+                return promise().catch(err=>{
+                    this.sendStatusMsg({}, 'Error in '+this.handleMatrixEvent.name, err, data);
+                });
+            }
         }
-
         return super.handleMatrixMessageEvent(data);
     }
 
@@ -147,33 +159,45 @@ class App extends MatrixPuppetBridgeBase {
     sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
         // no op for a MUD
     }
-    sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
-        if (text.endsWith(this.defaultDeduplicationTag())) {
-            console.log("Dropping dedupped message from Matrix");
-            return Promise.resolve();
+
+    getMudClient(id) {
+        let mud_id = mudUtils.idMatrixToMud(id);
+        for (let uname in config.users) {
+            if (uname == mud_id)
+                return config.users[uname].mudclient;
         }
-        return this.client.send(id, text);
+        return mainUser.mudclient;
     }
+
+    sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
+        return this.getMudClient(data.sender).send(id, text);
+    }
+
+    sendEmoteAsPuppetToThirdPartyRoomWithId(id, text, data) {
+        return this.getMudClient(data.sender).sendEmote(id, text);
+    }
+
     sendImageMessageAsPuppetToThirdPartyRoomWithId(
         _thirdPartyRoomId, _data, _matrixEvent) {
         console.log("sendImageMessageAsPuppetToThirdPartyRoomWithId: Generate url to send to MUD?");
         // Nothing to do for a MUD with this
-        return Promise.resolve();
+        return Promise.resolve(true);
     }
     sendFileMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
                                                   _matrixEvent) {
         console.log("sendFileMessageAsPuppetToThirdPartyRoomWithId: Generate url to send to MUD?");
         // Nothing to do for a MUD with this
-        return Promise.resolve();
+        return Promise.resolve(true);
     }
     sendReadReceiptAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId) {
         console.log("sendReadReceiptAsPuppetToThirdPartyRoomWithId");
         // Nothing to do for a MUD with this
-        return Promise.resolve();
+        return Promise.resolve(true);
     }
 }
 
-const mainUser = config.users[config.bridge.puppet];
+const mainUname = config.bridge.puppet;
+const mainUser = config.users[mainUname];
 const mainPuppet = new Puppet(path.join(__dirname, './config.json' ),
                               config, mainUser.puppet);
 mainUser.puppet = mainPuppet;
@@ -200,16 +224,16 @@ new Cli({
         // Login users
         for (let uname in config.users) {
             const user = config.users[uname];
-            if (uname == config.bridge.puppet)
+            if (uname == mainUname)
                 continue;
             console.log(`Logging ${uname} into Matrix...`);
-            user.mxcli = new Puppet(path.join(__dirname, './config.json' ),
+            user.mxclient = new Puppet(path.join(__dirname, './config.json' ),
                                       config, user.puppet);
-            user.mxcli.startClient();
+            user.mxclient.startClient();
         }
         console.log("Starting app...");
         const app = new App(config, mainPuppet);
-        console.log(`Logging main user ${config.bridge.puppet} into Matrix...`);
+        console.log(`Logging main user ${mainUname} into Matrix...`);
         return mainPuppet.startClient().then(()=>{
             return app.initThirdPartyClient();
         }).then(() => {

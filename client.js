@@ -4,6 +4,7 @@ const debugVerbose = debug('verbose:matrix-puppet:mud:client');
 const EventEmitter = require('events').EventEmitter;
 const Promise = require('bluebird');
 const readline = require('readline');
+const utils = require('./utils.js');
 
 const resolveData = ({data:{response}}) => {
     return Promise.resolve(response);
@@ -20,11 +21,12 @@ const State = {
 };
 
 class Client extends EventEmitter {
-    constructor(config, userCfg, dedup) {
+    constructor(config, userCfg, dedup, isMain) {
         super();
         this.config = config;
         this.userCfg = userCfg
         this.dedup = dedup;
+        this.isMain = isMain;
         this.socket = null;
         this.state = State.CONNECTING;
         this.players = {};
@@ -130,8 +132,14 @@ class Client extends EventEmitter {
                     let matches = Array.from(line.match(this.person_action_rx));
                     console.log(`ACTION ACTION ACTION: ${matches}`);
                     let mud_user = matches[1];
+                    let body = matches[3];
+                    if (body.startsWith(mud_user)) {
+                        body = body.slice(mud_user.length);
+                        if (body.startsWith(" "))
+                            body = body.slice(1);
+                    }
                     if (this.players.hasOwnProperty(mud_user))
-                        this.sendMatrixMessage(matches[3], null, "m.emote", null,
+                        this.sendMatrixMessage(body, null, "m.emote", null,
                                                mud_user);
                     else
                         this.sendMatrixBlock(line);
@@ -160,6 +168,12 @@ class Client extends EventEmitter {
         convo = convo || this.config.mud.name;
         mud_user = mud_user || this.config.mud.name;
         self_id = self_id || this.config.users.bobbit.id;
+
+        if (!this.isMain && mud_user != this.userCfg.mud.username) {
+            console.log(`Skipping line from other user=${mud_user}: ${body}`);
+            return;
+        }
+
         this.emit("message", {
             roomId: convo,
             senderName: mud_user,
@@ -197,6 +211,13 @@ class Client extends EventEmitter {
         if (msg.endsWith(this.dedup))
             msg = msg.slice(0, msg.length - 2);
         this.socket.write('"' + msg + "\n");
+        return Promise.resolve();
+    }
+
+    sendEmote(id, msg) {
+        if (msg.endsWith(this.dedup))
+            msg = msg.slice(0, msg.length - 2);
+        this.socket.write(':' + msg + "\n");
         return Promise.resolve();
     }
 }

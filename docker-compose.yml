@@ -17,5 +17,6 @@ services:
             - ./index.js:/mud/index.js
             - ./client.js:/mud/client.js
             - ./puppet.js:/mud/puppet.js
+            - ./utils.js:/mud/utils.js
             - ./mud-config.json:/mud/config.json
             - ./mud-registration.yaml:/mud/mud-registration.yaml
