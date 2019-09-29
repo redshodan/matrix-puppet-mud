@@ -158,8 +158,8 @@ class App extends MatrixPuppetBridgeBase {
     }
     sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
         // no op for a MUD
+        return Promise.resolve(true);
     }
-
     getMudClient(id) {
         let mud_id = mudUtils.idMatrixToMud(id);
         for (let uname in config.users) {
@@ -168,30 +168,27 @@ class App extends MatrixPuppetBridgeBase {
         }
         return mainUser.mudclient;
     }
-
     sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
         return this.getMudClient(data.sender).send(id, text);
     }
-
     sendEmoteAsPuppetToThirdPartyRoomWithId(id, text, data) {
         return this.getMudClient(data.sender).sendEmote(id, text);
     }
-
-    sendImageMessageAsPuppetToThirdPartyRoomWithId(
-        _thirdPartyRoomId, _data, _matrixEvent) {
+    sendImageMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
+                                                   _matrixEvent) {
+        // TODO:
         console.log("sendImageMessageAsPuppetToThirdPartyRoomWithId: Generate url to send to MUD?");
-        // Nothing to do for a MUD with this
         return Promise.resolve(true);
     }
     sendFileMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
                                                   _matrixEvent) {
+        // TODO:
         console.log("sendFileMessageAsPuppetToThirdPartyRoomWithId: Generate url to send to MUD?");
-        // Nothing to do for a MUD with this
         return Promise.resolve(true);
     }
     sendReadReceiptAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId) {
+        // TODO:
         console.log("sendReadReceiptAsPuppetToThirdPartyRoomWithId");
-        // Nothing to do for a MUD with this
         return Promise.resolve(true);
     }
 }
