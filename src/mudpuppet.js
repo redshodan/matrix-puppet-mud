@@ -20,7 +20,7 @@ const readConfigFile = (jsonFile, config) => {
 /**
  * Puppet class
  */
-class Puppet {
+class MUDPuppet {
   /**
    * Constructs a Puppet
    *
@@ -131,7 +131,7 @@ class Puppet {
           return writeFile(this.jsonFile, JSON.stringify(Object.assign({}, config, {
             puppet: {
               id,
-              localpart, 
+              localpart,
               token: accessDat.access_token
             }
           }), null, 2)).then(()=>{
@@ -162,4 +162,4 @@ class Puppet {
   }
 }
 
-module.exports = Puppet;
+module.exports = MUDPuppet;

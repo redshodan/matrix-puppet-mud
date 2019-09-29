@@ -4,7 +4,7 @@ const debugVerbose = debug('verbose:matrix-puppet:mud:client');
 const EventEmitter = require('events').EventEmitter;
 const Promise = require('bluebird');
 const readline = require('readline');
-const utils = require('./utils.js');
+const utils = require('./mudutils.js');
 
 const resolveData = ({data:{response}}) => {
     return Promise.resolve(response);
@@ -20,7 +20,7 @@ const State = {
     WHO_DB: "who_db"
 };
 
-class Client extends EventEmitter {
+class MUDClient extends EventEmitter {
     constructor(config, userCfg, dedup, isMain) {
         super();
         this.config = config;
@@ -146,6 +146,7 @@ class Client extends EventEmitter {
                     return;
                 }
 
+                console.log(`DEAULT DEFAULT DEFAULT`);
                 this.sendMatrixBlock(line);
             }
         });
@@ -222,4 +223,4 @@ class Client extends EventEmitter {
     }
 }
 
-module.exports = Client;
+module.exports = MUDClient;

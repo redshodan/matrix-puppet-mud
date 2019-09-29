@@ -5,13 +5,13 @@ const {
     MatrixPuppetBridgeBase,
     utils
 } = require("matrix-puppet-bridge");
-const Puppet = require('./puppet');
-const MUDClient = require('./client');
-const config = require('./config.json');
 const path = require('path');
 const debug = require('debug');
 const debugVerbose = debug('verbose:matrix-puppet:mud:index');
-const mudUtils = require('./utils.js');
+const MUDPuppet = require('./src/mudpuppet');
+const MUDClient = require('./src/mudclient');
+const mudutils = require('./src/mudutils');
+const config = require('./config.json');
 
 
 class App extends MatrixPuppetBridgeBase {
@@ -139,7 +139,8 @@ class App extends MatrixPuppetBridgeBase {
             return;
         } else {
             if (msgtype === 'm.emote') {
-                promise = () => this.sendEmoteAsPuppetToThirdPartyRoomWithId(thirdPartyRoomId, msg, data);
+                let msg = this.tagMatrixMessage(body);
+                let promise = () => this.sendEmoteAsPuppetToThirdPartyRoomWithId(thirdPartyRoomId, msg, data);
                 return promise().catch(err=>{
                     this.sendStatusMsg({}, 'Error in '+this.handleMatrixEvent.name, err, data);
                 });
@@ -161,7 +162,7 @@ class App extends MatrixPuppetBridgeBase {
         return Promise.resolve(true);
     }
     getMudClient(id) {
-        let mud_id = mudUtils.idMatrixToMud(id);
+        let mud_id = mudutils.idMatrixToMud(id);
         for (let uname in config.users) {
             if (uname == mud_id)
                 return config.users[uname].mudclient;
@@ -195,8 +196,8 @@ class App extends MatrixPuppetBridgeBase {
 
 const mainUname = config.bridge.puppet;
 const mainUser = config.users[mainUname];
-const mainPuppet = new Puppet(path.join(__dirname, './config.json' ),
-                              config, mainUser.puppet);
+const mainPuppet = new MUDPuppet(path.join(__dirname, './config.json' ),
+                                 config, mainUser.puppet);
 mainUser.puppet = mainPuppet;
 
 new Cli({
@@ -224,8 +225,8 @@ new Cli({
             if (uname == mainUname)
                 continue;
             console.log(`Logging ${uname} into Matrix...`);
-            user.mxclient = new Puppet(path.join(__dirname, './config.json' ),
-                                      config, user.puppet);
+            user.mxclient = new MUDPuppet(path.join(__dirname, './config.json' ),
+                                          config, user.puppet);
             user.mxclient.startClient();
         }
         console.log("Starting app...");
