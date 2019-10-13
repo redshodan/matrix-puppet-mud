@@ -3,5 +3,3 @@ package-lock.json
 npm-debug.log
 config.json
 mud-registration.yaml
-room-store.db
-user-store.db
