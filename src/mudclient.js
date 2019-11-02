@@ -10,8 +10,6 @@ const resolveData = ({data:{response}}) => {
     return Promise.resolve(response);
 };
 
-var zip = (a,b) => a.map((x,i) => [x,b[i]]);
-
 const State = {
     CONNECTING: "connecting",
     CONNECTED: "connected",
@@ -21,9 +19,10 @@ const State = {
 };
 
 class MUDClient extends EventEmitter {
-    constructor(config, userCfg, dedup, isMain) {
+    constructor(controller, mudCfg, userCfg, dedup, isMain) {
         super();
-        this.config = config;
+        this.controller = controller;
+        this.mudCfg = mudCfg;
         this.userCfg = userCfg
         this.dedup = dedup;
         this.isMain = isMain;
@@ -51,8 +50,8 @@ class MUDClient extends EventEmitter {
 
             /// State: CONNECTING
             if (this.state == State.CONNECTING && this.connect_rx.test(line)) {
-                this.socket.write("connect " + this.userCfg.mud.username + " " +
-                                  this.userCfg.mud.password + "\n");
+                this.socket.write("connect " + this.userCfg.username + " " +
+                                  this.userCfg.password + "\n");
                 this.sendPlayerSetup();
                 this.sendWHO();
                 return;
@@ -82,15 +81,15 @@ class MUDClient extends EventEmitter {
                 if (this.who_db_rx.test(line)) {
                     let matches = Array.from(line.match(this.who_db_rx));
                     let dbnums = Array.from(matches[1].split(" "));
-                    for (let [name, dbnum] of zip(this.players_ordered, dbnums)) {
+                    for (let [name, dbnum] of utils.zip(this.players_ordered, dbnums)) {
                         this.players[name].dbnum = dbnum;
-                        if (name == this.userCfg.mud.username) {
+                        if (name == this.userCfg.username) {
                             this.my_dbnum = dbnum;
                         }
                     }
                     this.state = State.CONNECTED;
                     console.log("Done with WHO. Players are:", this.players);
-                    this.sendMatrixNotice(`Connected to ${this.config.mud.name}`);
+                    this.sendMatrixNotice(`Connected to ${this.mudCfg.name}`);
                     return;
                 }
                 console.log(`Skipping this line in WHO_DB state: ${line}`);
@@ -108,9 +107,11 @@ class MUDClient extends EventEmitter {
                     let matches = Array.from(line.match(this.person_speaks_rx));
                     console.log(`SAY SAY SAY: ${matches}`);
                     let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[4];
                     if (this.players.hasOwnProperty(mud_user))
-                        this.sendMatrixMessage(matches[4], null, "m.text", null,
-                                               mud_user);
+                        this.sendMatrixMessage(body, null, "m.text",
+                                               mud_user, mud_dbnum);
                     else
                         this.sendMatrixBlock(line);
                     return;
@@ -120,11 +121,19 @@ class MUDClient extends EventEmitter {
                     let matches = Array.from(line.match(this.person_poses_rx));
                     console.log(`POSE POSE POSE: ${matches}`);
                     let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[3];
+                    let short = matches[3];
+                    if (short.startsWith(mud_user)) {
+                        short = short.slice(mud_user.length);
+                        if (short.startsWith(" "))
+                            short = short.slice(1);
+                    }
                     if (this.players.hasOwnProperty(mud_user))
-                        this.sendMatrixMessage(matches[3], null, "m.emote", null,
-                                               mud_user);
+                        this.sendMatrixMessage(short, null, "m.emote",
+                                               mud_user, mud_dbnum);
                     else
-                        this.sendMatrixBlock(line);
+                        this.sendMatrixBlock(body);
                     return;
                 }
                 /// Action: General person's action
@@ -132,17 +141,21 @@ class MUDClient extends EventEmitter {
                     let matches = Array.from(line.match(this.person_action_rx));
                     console.log(`ACTION ACTION ACTION: ${matches}`);
                     let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
                     let body = matches[3];
-                    if (body.startsWith(mud_user)) {
-                        body = body.slice(mud_user.length);
-                        if (body.startsWith(" "))
-                            body = body.slice(1);
+                    let short = matches[3];
+                    if (short.startsWith(mud_user)) {
+                        short = short.slice(mud_user.length);
+                        if (short.startsWith(" "))
+                            short = short.slice(1);
                     }
                     if (this.players.hasOwnProperty(mud_user))
-                        this.sendMatrixMessage(body, null, "m.emote", null,
-                                               mud_user);
+                        this.sendMatrixMessage(short, null, "m.emote",
+                                               mud_user, mud_dbnum);
                     else
-                        this.sendMatrixBlock(line);
+                    {
+                        this.sendMatrixBlock(body);
+                    }
                     return;
                 }
 
@@ -159,32 +172,39 @@ class MUDClient extends EventEmitter {
             // this.connect()
         });
 
-        this.socket.connect(this.config.mud.port, this.config.mud.host);
+        this.socket.connect(this.mudCfg.port, this.mudCfg.host);
 
-        debugVerbose('Connected to:', this.config.mud.host);
+        debugVerbose('Connected to:', this.mudCfg.host);
     }
 
-    sendMatrixMessage(body, html=undefined, msgtype="m.text", convo=undefined,
-                      mud_user=undefined, self_id=undefined) {
-        convo = convo || this.config.mud.name;
-        mud_user = mud_user || this.config.mud.name;
-        self_id = self_id || this.config.users.bobbit.id;
+    sendMatrixMessage(body, html=undefined, msgtype="m.text",
+                      mud_user=undefined, mud_dbnum=undefined, self_id=undefined)
+    {
+        mud_user = mud_user || this.mudCfg.name;
+        // HACK
+        self_id = self_id || "bobbit";
 
-        if (!this.isMain && mud_user != this.userCfg.mud.username) {
+        if (!this.isMain && mud_user != this.userCfg.username)
+        {
             console.log(`Skipping line from other user=${mud_user}: ${body}`);
+            return;
+        }
+        else if (this.isMain && mud_dbnum in this.controller.cliByDbNum)
+        {
+            console.log(`Skipping line from managed user user=${mud_user}/#${mud_dbnum}: ${body}`);
             return;
         }
 
         this.emit("message", {
-            roomId: convo,
+            roomId: this.mudCfg.name,
             senderName: mud_user,
             senderId: mud_user == self_id ? undefined : mud_user,
             avatarUrl: null,
             text: body,
             html: html,
             msgtype: msgtype,
-            conversation_id: convo,
-            conversation_name: convo
+            conversation_id: this.mudCfg.name,
+            conversation_name: this.mudCfg.name
         });
     }
 
@@ -208,14 +228,14 @@ class MUDClient extends EventEmitter {
         this.socket.write("WHO\n");
     }
 
-    send(id, msg) {
+    send(msg) {
         if (msg.endsWith(this.dedup))
             msg = msg.slice(0, msg.length - 2);
         this.socket.write('"' + msg + "\n");
         return Promise.resolve();
     }
 
-    sendEmote(id, msg) {
+    sendEmote(msg) {
         if (msg.endsWith(this.dedup))
             msg = msg.slice(0, msg.length - 2);
         this.socket.write(':' + msg + "\n");

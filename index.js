@@ -1,5 +1,7 @@
-const {
-    MatrixAppServiceBridge: {
+const
+{
+    MatrixAppServiceBridge:
+    {
         Cli, AppServiceRegistration
     },
     MatrixPuppetBridgeBase,
@@ -9,60 +11,58 @@ const path = require('path');
 const debug = require('debug');
 const debugVerbose = debug('verbose:matrix-puppet:mud:index');
 const MUDPuppet = require('./src/mudpuppet');
-const MUDClient = require('./src/mudclient');
+const MUDController = require('./src/mudcontroller');
 const mudutils = require('./src/mudutils');
 const config = require('./config.json');
 
 
-class App extends MatrixPuppetBridgeBase {
-    getServicePrefix() {
-        return config.servicePrefix;
+const thirdpty_msg = (
+    "this message was sent by me, but did it come from a matrix client or a " +
+    "3rd party client? if it came from a 3rd party client, we want to repeat " +
+    "it as a 'notice' type message. if it came from a matrix client, then " +
+    "it's already in the client, sending again would dupe. we use a tag on " +
+    "the end of messages to determine if it came from matrix"
+);
+
+
+class App extends MatrixPuppetBridgeBase
+{
+    constructor(config, puppet)
+    {
+        super(config, puppet);
+        this.mainUname = mainUname;
+        this.mainUser = mainUser;
+        this.mainPuppet = mainPuppet;
     }
-    getServiceName() {
-        return config.serviceName;
-    }
-    defaultDeduplicationTag() {
-        return " \u200b"; // Unicode Character 'ZERO WIDTH SPACE'
-    }
-    defaultDeduplicationTagPattern() {
-        return " \\u200b$"; // Unicode Character 'ZERO WIDTH SPACE'
-    }
-    initThirdPartyClient() {
-        this.threadInfo = {};
+
+    getServicePrefix() {return config.servicePrefix;}
+
+    getServiceName() {return config.serviceName;}
+
+    // Unicode Character 'ZERO WIDTH SPACE'
+    defaultDeduplicationTag() {return " \u200b";}
+
+    // Unicode Character 'ZERO WIDTH SPACE'
+    defaultDeduplicationTagPattern() {return " \\u200b$";}
+
+    initThirdPartyClient()
+    {
         this.userId = null;
         this.clients = [];
-        for (let uname in config.users) {
-            let client = new MUDClient(config, config.users[uname],
-                                       this.defaultDeduplicationTag(),
-                                       uname == mainUname);
-            config.users[uname].mudclient = client;
-            this.clients.push(client);
-            client.connect();
-
-            client.on('status', (statusTxt)=> {
-                this.sendStatusMsg({}, statusTxt);
-            });
-
-            client.on('message', (data)=> {
-                try {
-                    this.threadInfo[data.conversation_id] = {
-                        conversation_name: data.conversation_name,
-                    };
-                    return this.handleThirdPartyRoomMessage(data);
-                } catch(er) {
-                    console.log("incoming message handling error:", er);
-                    this.sendStatusMsg({}, "incoming message handling error:", err);
-                }
-            });
-        }
+        this.mudctlr = new MUDController(this, config,
+                                         this.defaultDeduplicationTag());
+        this.mudctlr.start();
     }
 
     // Override to map to the right matrix client
-    getUserClient(roomId, senderId, senderName, avatarUrl, doNotTryToGetRemoteUserStoreData) {
+    getUserClient(roomId, senderId, senderName, avatarUrl,
+                  doNotTryToGetRemoteUserStoreData)
+    {
         console.log("getUserClient", senderId, senderName);
         if (senderId === undefined)
             return Promise.resolve(this.puppet.getClient());
-        else if (senderId in config.users) {
+        else if (senderId in config.users)
+        {
             const user = config.users[senderId];
             return Promise.resolve(user.mxclient.getClient());
         }
@@ -72,9 +72,12 @@ class App extends MatrixPuppetBridgeBase {
     }
 
     // Override to make msgtype settable
-    handleThirdPartyRoomMessage(thirdPartyRoomMessageData) {
-        console.log('handling third party room message', thirdPartyRoomMessageData);
-        let {
+    handleThirdPartyRoomMessage(thirdPartyRoomMessageData)
+    {
+        console.log('handling third party room message',
+                    thirdPartyRoomMessageData);
+        let
+        {
             roomId,
             senderName,
             senderId,
@@ -89,10 +92,7 @@ class App extends MatrixPuppetBridgeBase {
         return this.getOrCreateMatrixRoomFromThirdPartyRoomId(roomId).then((matrixRoomId) => {
             return this.getUserClient(matrixRoomId, senderId, senderName, avatarUrl).then((client) => {
                 if (senderId === undefined) {
-                    console.log("this message was sent by me, but did it come from a matrix client or a 3rd party client?");
-                    console.log("if it came from a 3rd party client, we want to repeat it as a 'notice' type message");
-                    console.log("if it came from a matrix client, then it's already in the client, sending again would dupe");
-                    console.log("we use a tag on the end of messages to determine if it came from matrix");
+                    console.log(thirdpty_msg);
 
                     if (this.isTaggedMatrixMessage(text)) {
                         console.log('it is from matrix, so just ignore it.');
@@ -126,68 +126,82 @@ class App extends MatrixPuppetBridgeBase {
 
     // Override to not send warning message that can cause a message loop and
     // add in m.emote support
-    handleMatrixMessageEvent(data) {
+    handleMatrixMessageEvent(data)
+    {
         const { room_id, content: { body, msgtype } } = data;
         const thirdPartyRoomId = this.getThirdPartyRoomIdFromMatrixRoomId(room_id);
         const isStatusRoom = thirdPartyRoomId === this.getStatusRoomPostfix();
 
-        if (!thirdPartyRoomId) {
+        if (!thirdPartyRoomId)
             return;
-        } else if (isStatusRoom) {
+        else if (isStatusRoom)
+        {
             // Sometimes the base class sends a warning which can trigger a
             // message loop. so just don't do that nonsense.
             return;
-        } else {
-            if (msgtype === 'm.emote') {
+        }
+        else
+        {
+            if (msgtype === 'm.emote')
+            {
                 let msg = this.tagMatrixMessage(body);
-                let promise = () => this.sendEmoteAsPuppetToThirdPartyRoomWithId(thirdPartyRoomId, msg, data);
+                let promise = () =>
+                    this.sendEmoteAsPuppetToThirdPartyRoomWithId(
+                        thirdPartyRoomId, msg, data);
                 return promise().catch(err=>{
-                    this.sendStatusMsg({}, 'Error in '+this.handleMatrixEvent.name, err, data);
+                    this.sendStatusMsg(
+                        {}, 'Error in '+this.handleMatrixEvent.name, err, data);
                 });
             }
         }
         return super.handleMatrixMessageEvent(data);
     }
 
-    getThirdPartyRoomDataById(id) {
+    getThirdPartyRoomDataById(id)
+    {
         debugVerbose("getThirdPartyRoomDataById()", id)
-        let roomData = {
-            name: this.threadInfo[id].conversation_name,
-            topic: `${config.serviceName} Chat`
-        };
+        let roomData =
+            {
+                name: id,
+                topic: `${config.serviceName} Chat`
+            };
         return roomData;
     }
-    sendReadReceiptAsPuppetToThirdPartyRoomWithId() {
+
+    sendReadReceiptAsPuppetToThirdPartyRoomWithId()
+    {
         // no op for a MUD
         return Promise.resolve(true);
     }
-    getMudClient(id) {
-        let mud_id = mudutils.idMatrixToMud(id);
-        for (let uname in config.users) {
-            if (uname == mud_id)
-                return config.users[uname].mudclient;
-        }
-        return mainUser.mudclient;
+
+    sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data)
+    {
+        return this.mudctlr.sendToMud(id, text, data);
     }
-    sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data) {
-        return this.getMudClient(data.sender).send(id, text);
+
+    sendEmoteAsPuppetToThirdPartyRoomWithId(id, text, data)
+    {
+        return this.mudctlr.sendEmoteToMud(id, text, data);
     }
-    sendEmoteAsPuppetToThirdPartyRoomWithId(id, text, data) {
-        return this.getMudClient(data.sender).sendEmote(id, text);
-    }
+
     sendImageMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
-                                                   _matrixEvent) {
+                                                   _matrixEvent)
+    {
         // TODO:
         console.log("sendImageMessageAsPuppetToThirdPartyRoomWithId: Generate url to send to MUD?");
         return Promise.resolve(true);
     }
+
     sendFileMessageAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId, _data,
-                                                  _matrixEvent) {
+                                                  _matrixEvent)
+    {
         // TODO:
         console.log("sendFileMessageAsPuppetToThirdPartyRoomWithId: Generate url to send to MUD?");
         return Promise.resolve(true);
     }
-    sendReadReceiptAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId) {
+
+    sendReadReceiptAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId)
+    {
         // TODO:
         console.log("sendReadReceiptAsPuppetToThirdPartyRoomWithId");
         return Promise.resolve(true);
@@ -195,7 +209,7 @@ class App extends MatrixPuppetBridgeBase {
 }
 
 const mainUname = config.bridge.puppet;
-const mainUser = config.users[mainUname];
+const mainUser = config.users.find(user => user.mud.username == mainUname)
 const mainPuppet = new MUDPuppet(path.join(__dirname, './config.json' ),
                                  config, mainUser.puppet);
 mainUser.puppet = mainPuppet;
@@ -203,7 +217,8 @@ mainUser.puppet = mainPuppet;
 new Cli({
     port: config.port,
     registrationPath: config.registrationPath,
-    generateRegistration: function(reg, callback) {
+    generateRegistration: function(reg, callback)
+    {
         mainPuppet.associate().then(()=>{
             reg.setId(AppServiceRegistration.generateToken());
             reg.setHomeserverToken(AppServiceRegistration.generateToken());
@@ -218,13 +233,15 @@ new Cli({
             process.exit(-1);
         });
     },
-    run: function(port) {
+    run: function(port)
+    {
         // Login users
-        for (let uname in config.users) {
-            const user = config.users[uname];
-            if (uname == mainUname)
+        for (let index in config.users)
+        {
+            let user = config.users[index]
+            if (user.mud.username == mainUname)
                 continue;
-            console.log(`Logging ${uname} into Matrix...`);
+            console.log(`Logging ${user.mud.username} into Matrix...`);
             user.mxclient = new MUDPuppet(path.join(__dirname, './config.json' ),
                                           config, user.puppet);
             user.mxclient.startClient();
