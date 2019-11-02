@@ -211,8 +211,9 @@ class App extends MatrixPuppetBridgeBase
 const mainUname = config.bridge.puppet;
 const mainUser = config.users.find(user => user.mud.username == mainUname)
 const mainPuppet = new MUDPuppet(path.join(__dirname, './config.json' ),
-                                 config, mainUser.puppet);
-mainUser.puppet = mainPuppet;
+                                 config, mainUser ? mainUser.puppet : null);
+if (mainUser)
+    mainUser.puppet = mainPuppet;
 
 new Cli({
     port: config.port,
