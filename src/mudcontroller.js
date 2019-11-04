@@ -58,20 +58,22 @@ class MUDController extends EventEmitter
         {
             // console.log(`${id} found`);
             // console.log(this.cliByMxId[id]);
-            return this.cliByMxId[id];
+            return [true, this.cliByMxId[id]];
         }
         else
-            return this.mainClient;
+            return [false, this.mainClient];
     }
 
     sendToMud(id, text, data)
     {
-        return this.getMudClientByMxId(data.sender).send(text);
+        const [found, cli] = this.getMudClientByMxId(data.sender)
+        return cli.send(text, utils.idMatrixToMud(data.sender), found);
     }
 
     sendEmoteToMud(id, text, data)
     {
-        return this.getMudClientByMxId(data.sender).sendEmote(text);
+        const [found, cli] = this.getMudClientByMxId(data.sender)
+        return cli.sendEmote(text, utils.idMatrixToMud(data.sender), found);
     }
 }
 

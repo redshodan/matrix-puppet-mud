@@ -38,6 +38,8 @@ class MUDClient extends EventEmitter {
         this.person_speaks_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
         this.person_poses_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
         this.person_action_rx = /^\[([\w ]+)\(#(\d+)\)\] (.*)$/;
+        this.person_forced_speaks_rx =/^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
+        this.person_forced_poses_rx =/^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
     }
     connect() {
         debugVerbose("Connecting...");
@@ -100,6 +102,34 @@ class MUDClient extends EventEmitter {
                 /// Action: self say
                 if (line.startsWith("You say, ")) {
                     console.log("Skipping my own line");
+                    return;
+                }
+                /// Action: [person(#3)<-(#15),saypose] <person> says
+                if (this.person_forced_speaks_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_forced_speaks_rx));
+                    console.log(`FORCED SAY: ${matches}`);
+                    let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[6];
+                    if (this.players.hasOwnProperty(mud_user))
+                        this.sendMatrixMessage(body, null, "m.text",
+                                               mud_user, mud_dbnum);
+                    else
+                        this.sendMatrixBlock(line);
+                    return;
+                }
+                /// Action: [person(#3)<-(#15),saypose] <person> poses
+                if (this.person_forced_poses_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_forced_poses_rx));
+                    console.log(`FORCED SAY: ${matches}`);
+                    let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[5];
+                    if (this.players.hasOwnProperty(mud_user))
+                        this.sendMatrixMessage(body, null, "m.text",
+                                               mud_user, mud_dbnum);
+                    else
+                        this.sendMatrixBlock(line);
                     return;
                 }
                 /// Action: <person> say
@@ -228,17 +258,28 @@ class MUDClient extends EventEmitter {
         this.socket.write("WHO\n");
     }
 
-    send(msg) {
+    send(msg, sender, isMe) {
         if (msg.endsWith(this.dedup))
             msg = msg.slice(0, msg.length - 2);
-        this.socket.write('"' + msg + "\n");
+        if (isMe)
+        {
+            if (msg.startsWith("@"))
+                this.socket.write(msg.slice(1) + "\n");
+            else
+                this.socket.write('"' + msg + "\n");
+        }
+        else
+            this.socket.write(`@emit ${sender} says, "${msg}"\n`);
         return Promise.resolve();
     }
 
-    sendEmote(msg) {
+    sendEmote(msg, sender, isMe) {
         if (msg.endsWith(this.dedup))
             msg = msg.slice(0, msg.length - 2);
-        this.socket.write(':' + msg + "\n");
+        if (isMe)
+            this.socket.write(':' + msg + "\n");
+        else
+            this.socket.write(`@emit ${sender} ${msg}\n`);
         return Promise.resolve();
     }
 }
