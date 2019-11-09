@@ -17,7 +17,8 @@ class MUDController extends EventEmitter
         this.mainClient = null;
         this.clients = [];
         this.cliByMxId = {};
-        this.cliByDbNum = {};
+        this.cliByDBNum = {};
+        this.cliByMUDUser = {};
     }
 
     start()
@@ -30,7 +31,8 @@ class MUDController extends EventEmitter
             if (isMain)
                 this.mainClient = client;
             this.cliByMxId[ucfg.puppet.id] = client;
-            this.cliByDbNum[ucfg.mud.dbnum] = client;
+            this.cliByDBNum[ucfg.mud.dbnum] = client;
+            this.cliByMUDUser[ucfg.mud.username] = client;
             this.clients.push(client);
             client.connect();
 
@@ -48,18 +50,25 @@ class MUDController extends EventEmitter
                 }
             });
         }
-        // console.log("cliByMxId:");
-        // console.log(JSON.stringify(this.cliByMxId));
     }
 
     getMudClientByMxId(id) {
-        // console.log(`getMudClientByMxId: ${id}`);
         if (id in this.cliByMxId)
-        {
-            // console.log(`${id} found`);
-            // console.log(this.cliByMxId[id]);
             return [true, this.cliByMxId[id]];
-        }
+        else
+            return [false, this.mainClient];
+    }
+
+    getMudClientByDBNum(dbnum) {
+        if (dbnum in this.cliByDBNum)
+            return [true, this.cliByDBNum[dbnum]];
+        else
+            return [false, this.mainClient];
+    }
+
+    getMudClientByMUDUser(mud_user) {
+        if (mud_user in this.cliByMUDUser)
+            return [true, this.cliByMUDUser[mud_user]];
         else
             return [false, this.mainClient];
     }
