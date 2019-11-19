@@ -7,6 +7,13 @@ https://github.com/AndrewJDR/matrix-puppet-bridge
 This code is based on the matrix-puppet-hangouts bridge, see:
 https://github.com/matrix-hacks/matrix-puppet-hangouts
 
+## notice
+Unfortunately, this code is pretty tightly coupled to a particular MUX
+instance. MUDs, in general, don't supply a good API that can be used to create a
+bridge like this. Right now the code is hard coded to match my needs. How ever
+it could be a good starting point for someone else. In the future I want to
+abstract out mud types and any special handling.
+
 ## installation
 
 clone this repo
