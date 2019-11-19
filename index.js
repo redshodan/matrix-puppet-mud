@@ -58,7 +58,6 @@ class App extends MatrixPuppetBridgeBase
     getUserClient(roomId, senderId, senderName, avatarUrl,
                   doNotTryToGetRemoteUserStoreData)
     {
-        console.log("getUserClient", senderId, senderName);
         if (senderId === undefined)
             return Promise.resolve(this.puppet.getClient());
         else if (senderId in config.users)
@@ -92,8 +91,6 @@ class App extends MatrixPuppetBridgeBase
         return this.getOrCreateMatrixRoomFromThirdPartyRoomId(roomId).then((matrixRoomId) => {
             return this.getUserClient(matrixRoomId, senderId, senderName, avatarUrl).then((client) => {
                 if (senderId === undefined) {
-                    console.log(thirdpty_msg);
-
                     if (this.isTaggedMatrixMessage(text)) {
                         console.log('it is from matrix, so just ignore it.');
                         return;
@@ -168,12 +165,6 @@ class App extends MatrixPuppetBridgeBase
         return roomData;
     }
 
-    sendReadReceiptAsPuppetToThirdPartyRoomWithId()
-    {
-        // no op for a MUD
-        return Promise.resolve(true);
-    }
-
     sendMessageAsPuppetToThirdPartyRoomWithId(id, text, data)
     {
         return this.mudctlr.sendToMud(id, text, data);
@@ -202,8 +193,7 @@ class App extends MatrixPuppetBridgeBase
 
     sendReadReceiptAsPuppetToThirdPartyRoomWithId(_thirdPartyRoomId)
     {
-        // TODO:
-        console.log("sendReadReceiptAsPuppetToThirdPartyRoomWithId");
+        // no op for a MUD
         return Promise.resolve(true);
     }
 }

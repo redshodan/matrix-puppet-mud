@@ -35,7 +35,7 @@ class MUDClient extends EventEmitter {
         this.person_poses_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
         this.person_action_rx = /^\[([\w ]+)\(#(\d+)\)\] (.*)$/;
         this.person_forced_speaks_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
-        this.person_forced_poses_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
+        this.person_forced_poses_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]?)\(#(\d+)\),saypose\] (.*)$/;
         this.person_triggered_speaks_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] (.*) says, \"(.*)\"$/;
         this.person_triggered_poses_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] ([\w ]+) (.*)$/;
         this.default_nospoof_rx = /^\[[^\]]\] (.*)$/;
@@ -48,12 +48,12 @@ class MUDClient extends EventEmitter {
         this.rl = readline.createInterface({input: this.socket});
 
         this.rl.on('line', (line) => {
-            console.log(`Line from MUD: ${line}`);
+            this.log(`Line from MUD: ${line}`);
 
             /// State: CONNECTING
             if (this.state == State.CONNECTING && this.connect_rx.test(line))
             {
-                console.log("Logging in...");
+                this.log("Logging in...");
                 this.socket.write("connect " + this.muduser + " " +
                                   this.userCfg.password + "\n");
                 this.state = State.CONNECTED;
@@ -63,20 +63,20 @@ class MUDClient extends EventEmitter {
             // State: CONNECTED
             else if (this.state == State.CONNECTED && this.logged_in_rx.test(line))
             {
-                console.log("Logged in.");
+                this.log("Logged in.");
                 this.state = State.LOGGED_IN;
             }
             // State: LOGGED_IN
             else if (this.state == State.LOGGED_IN) {
                 /// Action: self say
                 if (line.startsWith("You say, ")) {
-                    console.log("Skipping my own line");
+                    this.log("Skipping my own line");
                     return;
                 }
                 /// Action: [person(#3)<-(#15),saypose] <person> says
                 if (this.person_forced_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_forced_speaks_rx));
-                    console.log(`FORCED SAY: ${matches}`);
+                    this.log(`FORCED SAY: ${matches}`);
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[6];
@@ -88,7 +88,7 @@ class MUDClient extends EventEmitter {
                 /// Action: [person(#3)<-(#15),saypose] <person> poses
                 else if (this.person_forced_poses_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_forced_poses_rx));
-                    console.log(`FORCED SAY: ${matches}`);
+                    this.log(`FORCED POSE: ${matches}`);
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[5];
@@ -100,7 +100,7 @@ class MUDClient extends EventEmitter {
                 /// Action, trigger: [person(#3){person}] <person> says
                 else if (this.person_triggered_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_triggered_speaks_rx));
-                    console.log(`TRIGGERED SAY: ${matches}`);
+                    this.log(`TRIGGERED SAY: ${matches}`);
                     let mud_user = matches[3];
                     let body = matches[4];
                     this.sendMatrixMessage({body:body, line:line,
@@ -110,7 +110,7 @@ class MUDClient extends EventEmitter {
                 /// Action, trigger: [person(#3){person}] <person> poses
                 else if (this.person_triggered_poses_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_triggered_poses_rx));
-                    console.log(`TRIGGERED POSE: ${matches}`);
+                    this.log(`TRIGGERED POSE: ${matches}`);
                     let mud_user = matches[4];
                     let body = matches[5];
                     this.sendMatrixMessage({
@@ -121,7 +121,7 @@ class MUDClient extends EventEmitter {
                 /// Action: <person> say
                 else if (this.person_speaks_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_speaks_rx));
-                    console.log(`SAY SAY SAY: ${matches}`);
+                    this.log(`SAY SAY SAY: ${matches}`);
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[4];
@@ -133,7 +133,7 @@ class MUDClient extends EventEmitter {
                 /// Action: <person>'s pose
                 else if (this.person_poses_apo_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_poses_apo_rx));
-                    console.log(`POSE's POSE's POSE's: ${matches}`);
+                    this.log(`POSE's POSE's POSE's: ${matches}`);
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[3];
@@ -151,7 +151,7 @@ class MUDClient extends EventEmitter {
                 /// Action: <person> pose
                 else if (this.person_poses_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_poses_rx));
-                    console.log(`POSE POSE POSE: ${matches}`);
+                    this.log(`POSE POSE POSE: ${matches}`);
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[3];
@@ -169,7 +169,7 @@ class MUDClient extends EventEmitter {
                 /// Action: General person's action
                 else if (this.person_action_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_action_rx));
-                    console.log(`ACTION ACTION ACTION: ${matches}`);
+                    this.log(`ACTION ACTION ACTION: ${matches}`);
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[3];
@@ -178,20 +178,21 @@ class MUDClient extends EventEmitter {
                         short = short.slice(mud_user.length);
                         if (short.startsWith(" "))
                             short = short.slice(1);
-                    }
-                    this.sendMatrixMessage({
-                        body:short, line:body, msgtype:"m.emote",
-                        mud_user:mud_user, mud_dbnum:mud_dbnum});
+                        this.sendMatrixMessage({
+                            body:short, line:body, msgtype:"m.emote",
+                            mud_user:this.mudCfg.name, mud_dbnum:mud_dbnum});
+                    } else
+                        this.sendMatrixBlock(body);
                     return;
                 }
                 /// Action: self speaking/posing, no @nospoof prefix
                 else if (line.startsWith(this.muduser))
                 {
-                    console.log(`Skipping self pose: ${line}`);
+                    this.log(`Skipping self pose: ${line}`);
                     return;
                 }
 
-                console.log(`DEFAULT DEFAULT DEFAULT`);
+                this.log(`DEFAULT DEFAULT DEFAULT`);
                 if (this.default_nospoof_rx.test(line))
                 {
                     let matches = Array.from(line.match(this.default_nospoof_rx));
@@ -218,19 +219,19 @@ class MUDClient extends EventEmitter {
     sendMatrixMessage({body=null, html=undefined, line=null, msgtype="m.text",
                        mud_user=null, mud_dbnum=null} = {})
     {
-        return this._sendMatrixMessage(utils.escapeMsgBody(body), html, line,
+        return this._sendMatrixMessage(utils.escapeMsgBody(body), html,
+                                       utils.escapeMsgBody(line),
                                        msgtype, mud_user, mud_dbnum);
     }
 
     _sendMatrixMessage(body, html, line, msgtype, mud_user, mud_dbnum)
     {
-        console.log(`_sendMatrixMessage(${body}, ${html}, ${line}, ${msgtype}, ${mud_user}, ${mud_dbnum})`);
-        console.log(this.controller.cliByDbNum);
+        this.log(`_sendMatrixMessage:\n${body}\n${html}\n${line}\n${msgtype} ${mud_user} ${mud_dbnum}`);
         mud_user = mud_user || this.muduser;
 
         if (!this.isMain && mud_user != this.muduser)
         {
-            console.log(`Skipping line from other user=${mud_user}: ${body}`);
+            this.log(`Skipping line from other user=${mud_user}: ${body}`);
             return;
         }
         else if (this.isMain)
@@ -238,13 +239,14 @@ class MUDClient extends EventEmitter {
             if (mud_dbnum != null &&
                 this.controller.getMudClientByDBNum(mud_dbnum)[0])
             {
-                console.log(`Skipping line from managed user user=${mud_user}/#${mud_dbnum}: ${body}`);
+                this.log(`Skipping line from managed user user=${mud_user}/#${mud_dbnum}: ${body}`);
                 return;
             }
             else
             {
-                console.log(`Sending block-line from un-managed user user=${mud_user}/#${mud_dbnum}: ${body}`);
-                html = `<pre><code>${body}</code></pre>`;
+                this.log(`Sending block-line from un-managed user user=${mud_user}/#${mud_dbnum}: ${body}`);
+                // body = line;
+                // html = `<pre><code>${line}</code></pre>`;
             }
         }
 
@@ -263,14 +265,16 @@ class MUDClient extends EventEmitter {
 
     sendMatrixNotice(body)
     {
+        body = utils.escapeMsgBody(body);
         this._sendMatrixMessage(body, `<h1>${body}</h1>`, null, "m.notice",
                                 null, null);
     }
 
     sendMatrixBlock(body, msgtype="m.text")
     {
+        body = utils.escapeMsgBody(body);
         this._sendMatrixMessage(body, `<pre><code>${body}</code></pre>`, null,
-                                msgtype, null, null);
+                                msgtype, this.mudCfg.name, null);
     }
 
     sendPlayerSetup()
@@ -304,6 +308,11 @@ class MUDClient extends EventEmitter {
         else
             this.socket.write(`@emit ${sender} ${msg}\n`);
         return Promise.resolve();
+    }
+
+    log(msg)
+    {
+        console.log(`[MUDClient(${this.muduser})] ${msg}`);
     }
 }
 
