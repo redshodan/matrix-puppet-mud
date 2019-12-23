@@ -18,6 +18,12 @@ function escapeMsgBody(body)
     return ret;
 }
 
+function matrixMud1on1Room(matrix_user, mud_user)
+{
+    return `${matrix_user} and ${mud_user}`.replace(/ /g, "_");
+}
+
 module.exports.zip = zip;
 module.exports.idMatrixToMud = idMatrixToMud;
 module.exports.escapeMsgBody = escapeMsgBody;
+module.exports.matrixMud1on1Room = matrixMud1on1Room;

@@ -24,7 +24,7 @@ class MUDClient extends EventEmitter {
         this.userCfg = userCfg
         this.dedup = dedup;
         this.isMain = isMain;
-        this.muduser = this.userCfg.username;
+        this.muduser = this.userCfg.mud.username;
         this.socket = null;
         this.state = State.CONNECTING;
         this.my_dbnum = null;
@@ -33,6 +33,8 @@ class MUDClient extends EventEmitter {
         this.person_speaks_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
         this.person_poses_apo_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] \w+('s .*)$/;
         this.person_poses_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
+        this.person_whispers_rx = /^\[([\w ]+)\(#(\d+)\)\] .* whispers \"(.*)\"$/;
+        this.person_pages_rx = /^\[([\w ]+)\(#(\d+)\),page\] .* pages: (.*)$/;
         this.person_action_rx = /^\[([\w ]+)\(#(\d+)\)\] (.*)$/;
         this.person_forced_speaks_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
         this.person_forced_poses_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]?)\(#(\d+)\),saypose\] (.*)$/;
@@ -55,7 +57,7 @@ class MUDClient extends EventEmitter {
             {
                 this.log("Logging in...");
                 this.socket.write("connect " + this.muduser + " " +
-                                  this.userCfg.password + "\n");
+                                  this.userCfg.mud.password + "\n");
                 this.state = State.CONNECTED;
                 this.sendPlayerSetup();
                 return;
@@ -166,6 +168,26 @@ class MUDClient extends EventEmitter {
                         mud_user:mud_user, mud_dbnum:mud_dbnum});
                     return;
                 }
+                /// Action: <person> whispers "..."
+                else if (this.person_whispers_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_whispers_rx));
+                    this.log(`WHISPER WHISPER WHISPER: ${matches}`);
+                    let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[3];
+                    this.sendMatrix1on1(body, mud_user, mud_dbnum);
+                    return;
+                }
+                /// Action: <person> pages:
+                else if (this.person_pages_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_pages_rx));
+                    this.log(`PAGE PAGE PAGE: ${matches}`);
+                    let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[3];
+                    this.sendMatrix1on1(body, mud_user, mud_dbnum);
+                    return;
+                }
                 /// Action: General person's action
                 else if (this.person_action_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_action_rx));
@@ -254,12 +276,34 @@ class MUDClient extends EventEmitter {
             roomId: this.mudCfg.name,
             senderName: mud_user,
             senderId: mud_user,
+            receiverId: this.userCfg.puppet.id,
             avatarUrl: null,
             text: body,
             html: html,
-            msgtype: msgtype,
-            conversation_id: this.mudCfg.name,
-            conversation_name: this.mudCfg.name
+            msgtype: msgtype
+        });
+    }
+
+    sendMatrix1on1(body, mud_user, mud_dbnum)
+    {
+        this.log(`sendMatrix1on1: ${mud_user} ${mud_dbnum}\n${body}`);
+
+        let canonical = this.controller.getMudNameByDBNum(mud_dbnum);
+        if (canonical == null)
+            canonical = mud_user;
+        let room_id = utils.matrixMud1on1Room(
+            utils.idMatrixToMud(this.userCfg.puppet.id), canonical);
+        this.log("1on1 roomid: " + room_id);
+
+        this.emit("message", {
+            roomId: room_id,
+            senderName: canonical,
+            senderId: canonical,
+            receiverId: this.userCfg.puppet.id,
+            avatarUrl: null,
+            text: utils.escapeMsgBody(body),
+            html: null,
+            msgtype: "m.text"
         });
     }
 

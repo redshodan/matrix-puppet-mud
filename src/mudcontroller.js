@@ -19,6 +19,8 @@ class MUDController extends EventEmitter
         this.cliByMxId = {};
         this.cliByDBNum = {};
         this.cliByMUDUser = {};
+        this.mudNameByDBNum = {};
+        this.puppetByMxId = {};
     }
 
     start()
@@ -26,13 +28,15 @@ class MUDController extends EventEmitter
         for (let index in this.config.users) {
             let ucfg = this.config.users[index];
             let isMain = ucfg.mud.username == this.app.mainUname;
-            let client = new MUDClient(this, this.config.mud, ucfg.mud,
+            let client = new MUDClient(this, this.config.mud, ucfg,
                                        this.dedup, isMain);
             if (isMain)
                 this.mainClient = client;
             this.cliByMxId[ucfg.puppet.id] = client;
             this.cliByDBNum[ucfg.mud.dbnum] = client;
             this.cliByMUDUser[ucfg.mud.username] = client;
+            this.mudNameByDBNum[ucfg.mud.dbnum] = ucfg.mud.username;
+            this.puppetByMxId[ucfg.puppet.id] = ucfg.mxclient;
             this.clients.push(client);
             client.connect();
 
@@ -50,6 +54,8 @@ class MUDController extends EventEmitter
                 }
             });
         }
+        console.log("puppets:");
+        console.log(this.puppetByMxId);
     }
 
     getMudClientByMxId(id) {
@@ -73,8 +79,23 @@ class MUDController extends EventEmitter
             return [false, this.mainClient];
     }
 
+    getMudNameByDBNum(dbnum) {
+        if (dbnum in this.mudNameByDBNum)
+            return this.mudNameByDBNum[dbnum];
+        else
+            return null;
+    }
+
+    getPuppetByMxId(id) {
+        if (id in this.puppetByMxId)
+            return this.puppetByMxId[id];
+        else
+            return undefined;
+    }
+
     sendToMud(id, text, data)
     {
+        console.log(`sendToMud: ${id}`);
         const [found, cli] = this.getMudClientByMxId(data.sender)
         return cli.send(text, utils.idMatrixToMud(data.sender), found);
     }
