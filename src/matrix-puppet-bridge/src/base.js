@@ -203,11 +203,12 @@ class Base {
    * @param {object} puppet Instance of Puppet to use
    * @param {object} bridge Optional instance of Bridge to use
    */
-  constructor(config, puppet, bridge) {
+  constructor(config, puppet, puppets, bridge) {
     const { info } = debug();
     this.allowNullSenderName = false;
     this.config = config;
     this.puppet = puppet;
+    this.puppets = puppets;
     this.domain = config.bridge.domain;
     this.homeserver = urlParse(config.bridge.homeserverUrl);
     this.deduplicationTag = this.config.deduplicationTag || this.defaultDeduplicationTag();
@@ -217,6 +218,8 @@ class Base {
     info('initialized');
 
     this.puppet.setApp(this)
+    for (let index in this.puppets)
+      this.puppets[index].setApp(this);
   }
 
   /**
@@ -517,13 +520,14 @@ class Base {
       }
     });
   }
-  getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId) {
-      const { warn, info } = debug(this.getOrCreateMatrixRoomFromThirdPartyRoomId.name);
-      warn("BASE BASE BASE.getOrCreateMatrixRoomFromThirdPartyRoomId");
+  getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId, puppet) {
+    const { warn, info } = debug(this.getOrCreateMatrixRoomFromThirdPartyRoomId.name);
+    puppet = puppet || this.puppet;
+
     const roomAlias = this.getRoomAliasFromThirdPartyRoomId(thirdPartyRoomId);
     const roomAliasName = this.getRoomAliasLocalPartFromThirdPartyRoomId(thirdPartyRoomId);
     info('looking up', thirdPartyRoomId);
-    const puppetClient = this.puppet.getClient();
+    const puppetClient = puppet.getClient();
     const botIntent = this.getIntentFromApplicationServerBot();
     const botClient = botIntent.getClient();
     const puppetUserId = puppetClient.credentials.userId;
@@ -577,7 +581,7 @@ class Base {
         }
       });
     }).then(matrixRoomId => {
-      this.puppet.saveThirdPartyRoomId(matrixRoomId, thirdPartyRoomId);
+      puppet.saveThirdPartyRoomId(matrixRoomId, thirdPartyRoomId);
       return matrixRoomId;
     });
   }
@@ -599,6 +603,9 @@ class Base {
 
     if (senderId === undefined) {
       return Promise.resolve(this.puppet.getClient());
+    } else if (senderId in this.puppets) {
+      info(`getUserClient found ${senderId}`);
+      return Promise.resolve(this.puppets[senderId].getClient());
     } else {
       if (!senderName && !this.allowNullSenderName) {
         if (doNotTryToGetRemoteUserStoreData)
@@ -622,6 +629,17 @@ class Base {
             .then(() => ghostIntent.getClient());
         });
     }
+  }
+
+  getPuppet(senderId)
+  {
+      console.log(`getPuppet: ${senderId}`);
+      if (senderId === undefined)
+          return this.puppet;
+      else if (senderId in this.puppets)
+          return this.puppets[senderId];
+      else
+          return this.puppet;
   }
 
   /**
@@ -721,22 +739,27 @@ class Base {
   handleThirdPartyRoomMessage(thirdPartyRoomMessageData) {
     const { info } = debug(this.handleThirdPartyRoomMessage.name);
     info('handling third party room message', thirdPartyRoomMessageData);
-    const {
+    let {
       roomId,
       senderName,
       senderId,
+      receiverId,
       avatarUrl,
       text,
-      html
+      html,
+      msgtype
     } = thirdPartyRoomMessageData;
 
-    return this.getOrCreateMatrixRoomFromThirdPartyRoomId(roomId).then((matrixRoomId) => {
+    msgtype = msgtype || "m.txt";
+
+    let puppet = this.getPuppet(receiverId);
+    return this.getOrCreateMatrixRoomFromThirdPartyRoomId(roomId, puppet).then((matrixRoomId) => {
       return this.getUserClient(matrixRoomId, senderId, senderName, avatarUrl).then((client) => {
         if (senderId === undefined) {
-          info("this message was sent by me, but did it come from a matrix client or a 3rd party client?");
-          info("if it came from a 3rd party client, we want to repeat it as a 'notice' type message");
-          info("if it came from a matrix client, then it's already in the client, sending again would dupe");
-          info("we use a tag on the end of messages to determine if it came from matrix");
+          // info("this message was sent by me, but did it come from a matrix client or a 3rd party client?");
+          // info("if it came from a 3rd party client, we want to repeat it as a 'notice' type message");
+          // info("if it came from a matrix client, then it's already in the client, sending again would dupe");
+          // info("we use a tag on the end of messages to determine if it came from matrix");
 
           if (this.isTaggedMatrixMessage(text)) {
             info('it is from matrix, so just ignore it.');
@@ -753,12 +776,12 @@ class Base {
             body: tag(text),
             formatted_body: html,
             format: "org.matrix.custom.html",
-            msgtype: "m.text"
+            msgtype: msgtype
           });
         } else {
           return client.sendMessage(matrixRoomId, {
             body: tag(text),
-            msgtype: "m.text"
+            msgtype: msgtype
           });
         }
       });
@@ -796,11 +819,11 @@ class Base {
     } else if (isStatusRoom) {
       logger.info("ignoring incoming message to status room");
 
-      msg = this.tagMatrixMessage("Commands are currently ignored here");
+      // msg = this.tagMatrixMessage("Commands are currently ignored here");
 
-      // We may wish to process bang commands here at some point,
-      // but for now let's just send a message back
-      promise = () => this.sendStatusMsg({ fixedWidthOutput: false }, msg);
+      // // We may wish to process bang commands here at some point,
+      // // but for now let's just send a message back
+      // promise = () => this.sendStatusMsg({ fixedWidthOutput: false }, msg);
 
     } else {
       msg = this.tagMatrixMessage(body);
@@ -832,6 +855,15 @@ class Base {
 	  size: data.content.info.size,
 	  filename: data.content.filename,
 	}, data);
+      } else if (msgtype === 'm.emote') {
+          let msg = this.tagMatrixMessage(body);
+          let promise = () =>
+              this.sendEmoteAsPuppetToThirdPartyRoomWithId(
+                  thirdPartyRoomId, msg, data);
+          return promise().catch(err=>{
+              this.sendStatusMsg(
+                  {}, 'Error in '+this.handleMatrixEvent.name, err, data);
+          });
       } else {
         promise = () => Promise.reject(new Error('dont know how to handle this msgtype', msgtype));
       }
