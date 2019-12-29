@@ -16,8 +16,54 @@
   ],
   "license": "ISC",
   "dependencies": {
-    "bluebird": "^3.4.7",
-    "matrix-puppet-bridge": "1.16.1"
+    "bluebird": "^3.4.6",
+    "concat-stream": "^1.6.0",
+    "debug": "^2.6.0",
+    "matrix-appservice-bridge": "^1.4.0a",
+    "matrix-js-sdk": "^0.7.8",
+    "mime-types": "^2.1.14",
+    "needle": "^1.4.5",
+    "read": "^1.0.7",
+    "tempfile": "^1.1.1",
+    "tmp": "^0.0.31"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "eslint": "^6.8.0",
+    "jsdoc": "^3.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/redshodan/matrix-puppet-mud.git"
+  },
+  "eslintConfig": {
+    "env": {
+      "es6": true,
+      "node": true
+    },
+    "extends": "eslint:recommended",
+    "rules": {
+      "no-console": 0,
+      "indent": [
+        "error",
+        2,
+        {
+          "SwitchCase": 1
+        }
+      ],
+      "linebreak-style": [
+        "error",
+        "unix"
+      ],
+      "semi": [
+        "error",
+        "always"
+      ],
+      "no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    }
+  }
 }
