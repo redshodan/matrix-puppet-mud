@@ -35,6 +35,7 @@ class MUDClient extends EventEmitter {
         this.person_poses_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*)$/;
         this.person_whispers_rx = /^\[([\w ]+)\(#(\d+)\)\] .* whispers \"(.*)\"$/;
         this.person_pages_rx = /^\[([\w ]+)\(#(\d+)\),page\] .* pages: (.*)$/;
+        this.person_page_pose_rx = /^\[([\w ]+)\(#(\d+)\),page\] From afar, (.*)$/;
         this.person_action_rx = /^\[([\w ]+)\(#(\d+)\)\] (.*)$/;
         this.person_forced_speaks_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
         this.person_forced_poses_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]?)\(#(\d+)\),saypose\] (.*)$/;
@@ -191,6 +192,21 @@ class MUDClient extends EventEmitter {
                     this.sendMatrix1on1(body, mud_user, mud_dbnum);
                     return;
                 }
+                /// Action: From afar, <person> ...
+                else if (this.person_page_pose_rx.test(line)) {
+                    let matches = Array.from(line.match(this.person_page_pose_rx));
+                    this.log(`PAGE POSE PAGE POSE PAGE POSE: ${matches}`);
+                    let mud_user = matches[1];
+                    let mud_dbnum = matches[2];
+                    let body = matches[3];
+                    if (body.startsWith(mud_user)) {
+                        body = body.slice(mud_user.length);
+                        if (body.startsWith(" "))
+                            body = body.slice(1);
+                    }
+                    this.sendMatrix1on1(body, mud_user, mud_dbnum, "m.emote");
+                    return;
+                }
                 /// Action: General person's action
                 else if (this.person_action_rx.test(line)) {
                     let matches = Array.from(line.match(this.person_action_rx));
@@ -287,7 +303,7 @@ class MUDClient extends EventEmitter {
         });
     }
 
-    sendMatrix1on1(body, mud_user, mud_dbnum)
+    sendMatrix1on1(body, mud_user, mud_dbnum, msgtype="m.text")
     {
         this.log(`sendMatrix1on1: ${mud_user} ${mud_dbnum}\n${body}`);
 
@@ -306,7 +322,7 @@ class MUDClient extends EventEmitter {
             avatarUrl: null,
             text: utils.escapeMsgBody(body),
             html: null,
-            msgtype: "m.text"
+            msgtype: msgtype
         });
     }
 
