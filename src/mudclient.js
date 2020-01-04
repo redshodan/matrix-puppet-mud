@@ -41,6 +41,7 @@ class MUDClient extends EventEmitter {
         this.person_triggered_speaks_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] (.*) says, \"(.*)\"$/;
         this.person_triggered_poses_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] ([\w ]+) (.*)$/;
         this.default_nospoof_rx = /^\[[^\]]\] (.*)$/;
+        this.you_paged_rx = /^You paged (.*) with '/;
     }
 
     connect() {
@@ -71,7 +72,9 @@ class MUDClient extends EventEmitter {
             // State: LOGGED_IN
             else if (this.state == State.LOGGED_IN) {
                 /// Action: self say
-                if (line.startsWith("You say, ")) {
+                if (line.startsWith("You say, ") ||
+                    this.you_paged_rx.test(line))
+                {
                     this.log("Skipping my own line");
                     return;
                 }
@@ -351,6 +354,14 @@ class MUDClient extends EventEmitter {
             this.socket.write(':' + msg + "\n");
         else
             this.socket.write(`@emit ${sender} ${msg}\n`);
+        return Promise.resolve();
+    }
+
+    sendPage(msg, recipient)
+    {
+        if (msg.endsWith(this.dedup))
+            msg = msg.slice(0, msg.length - 2);
+        this.socket.write(`page ${recipient}="${msg}\n`);
         return Promise.resolve();
     }
 

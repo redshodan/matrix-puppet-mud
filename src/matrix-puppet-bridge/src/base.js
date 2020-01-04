@@ -446,11 +446,12 @@ class Base {
     const matches = localpart.match(patt);
     return matches ? matches[1] : null;
   }
-  getThirdPartyRoomIdFromMatrixRoomId(matrixRoomId) {
+  getThirdPartyRoomIdFromMatrixRoomId(matrixRoomId, sender_id) {
     const { info } = debug(this.getThirdPartyRoomIdFromMatrixRoomId.name);
     const patt = new RegExp(`^#${this.getServicePrefix()}_(.+)$`);
-    const room = this.puppet.getClient().getRoom(matrixRoomId);
-    info('reducing array of alases to a 3prid');
+    const puppet = this.getPuppet(sender_id);
+    const room = puppet.getClient().getRoom(matrixRoomId);
+    info(`reducing array of alases to a 3prid: ${matrixRoomId}`);
     return room.getAliases().reduce((result, alias) => {
       const localpart = alias.replace(':'+this.domain, '');
       const matches = localpart.match(patt);
@@ -523,6 +524,7 @@ class Base {
   getOrCreateMatrixRoomFromThirdPartyRoomId(thirdPartyRoomId, puppet) {
     const { warn, info } = debug(this.getOrCreateMatrixRoomFromThirdPartyRoomId.name);
     puppet = puppet || this.puppet;
+    info(`puppet: ${puppet}`);
 
     const roomAlias = this.getRoomAliasFromThirdPartyRoomId(thirdPartyRoomId);
     const roomAliasName = this.getRoomAliasLocalPartFromThirdPartyRoomId(thirdPartyRoomId);
@@ -802,7 +804,7 @@ class Base {
   }
   handleMatrixMessageEvent(data) {
     const logger = debug(this.handleMatrixMessageEvent.name);
-    const { room_id, content: { body, msgtype } } = data;
+    const { room_id, content: { body, msgtype }, sender } = data;
 
     let promise, msg;
 
@@ -811,7 +813,7 @@ class Base {
       return;
     }
 
-    const thirdPartyRoomId = this.getThirdPartyRoomIdFromMatrixRoomId(room_id);
+    const thirdPartyRoomId = this.getThirdPartyRoomIdFromMatrixRoomId(room_id, sender);
     const isStatusRoom = thirdPartyRoomId === this.getStatusRoomPostfix();
 
     if (!thirdPartyRoomId) {

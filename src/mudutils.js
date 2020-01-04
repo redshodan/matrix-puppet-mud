@@ -11,6 +11,19 @@ function idMatrixToMud(id)
         return id;
 }
 
+function oneOnOneRoomToMudUser(roomName, mudSender)
+{
+    let prefix = mudSender + "_and_";
+    if (roomName.startsWith(prefix))
+    {
+        let recipient = roomName.slice(prefix.length);
+        console.log(`oneOnOneRoomToMudUser: ${recipient}`);
+        return recipient;
+    }
+    else
+        return undefined;
+}
+
 function escapeMsgBody(body)
 {
     let ret = body.replace("<", "&lt;");
@@ -27,3 +40,4 @@ module.exports.zip = zip;
 module.exports.idMatrixToMud = idMatrixToMud;
 module.exports.escapeMsgBody = escapeMsgBody;
 module.exports.matrixMud1on1Room = matrixMud1on1Room;
+module.exports.oneOnOneRoomToMudUser = oneOnOneRoomToMudUser;

@@ -19,6 +19,7 @@ class MUDController extends EventEmitter
         this.cliByDBNum = {};
         this.cliByMUDUser = {};
         this.mudNameByDBNum = {};
+        this.mxRoomByMxID = {};
     }
 
     start()
@@ -80,11 +81,35 @@ class MUDController extends EventEmitter
             return null;
     }
 
+    getMxRoomNameByMxID(mxid, senderid)
+    {
+        if (mxid in this.mxRoomByMxID)
+            return this.mxRoomByMxID[mxid];
+        else
+        {
+            console.log(`getMxRoomNameByMxID: querying on ${mxid}`);
+            let room = this.app.getThirdPartyRoomIdFromMatrixRoomId(mxid, senderid);
+            console.log(`getMxRoomNameByMxID: ${room}`);
+            self.mxRoomByMxID[mxid] = room;
+            return room;
+        }
+    }
+
     sendToMud(id, text, data)
     {
-        console.log(`sendToMud: ${id}`);
+        console.log(`sendToMud: ${id}: ${data}`);
         const [found, cli] = this.getMudClientByMxId(data.sender)
-        return cli.send(text, utils.idMatrixToMud(data.sender), found);
+        const mudSender = utils.idMatrixToMud(data.sender);
+        if (id == this.config.mud.name)
+            return cli.send(text, mudSender, found);
+        else
+        {
+            let recipient = utils.oneOnOneRoomToMudUser(id, mudSender);
+            if (recipient)
+                return cli.sendPage(text, recipient);
+            else
+                console.log(`Failed to map one on one room name: ${id} for matrix user ${mudSender}`);
+        }
     }
 
     sendEmoteToMud(id, text, data)
