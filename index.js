@@ -1,5 +1,6 @@
 const
 {
+    Puppet,
     MatrixAppServiceBridge:
     {
         Cli, AppServiceRegistration
@@ -10,9 +11,7 @@ const
 const path = require('path');
 const debug = require('debug');
 const debugVerbose = debug('verbose:matrix-puppet:mud:index');
-const MUDPuppet = require('./src/mudpuppet');
 const MUDController = require('./src/mudcontroller');
-const mudutils = require('./src/mudutils');
 const config = require('./config.json');
 
 
@@ -91,8 +90,8 @@ class App extends MatrixPuppetBridgeBase
 
 const mainUname = config.bridge.puppet;
 const mainUser = config.users.find(user => user.mud.username == mainUname)
-const mainPuppet = new MUDPuppet(path.join(__dirname, './config.json' ),
-                                 config, mainUser ? mainUser.puppet : null);
+const mainPuppet = new Puppet(path.join(__dirname, './config.json' ),
+                              config, mainUser ? mainUser.puppet : null);
 
 new Cli({
     port: config.port,
@@ -124,8 +123,8 @@ new Cli({
             if (user.mud.username == mainUname)
                 continue;
             console.log(`Logging ${user.mud.username} into Matrix...`);
-            let puppet = new MUDPuppet(path.join(__dirname, './config.json' ),
-                                       config, user.puppet);
+            let puppet = new Puppet(path.join(__dirname, './config.json' ),
+                                    config, user.puppet);
             puppets[user.puppet.id] = puppet;
             puppet.startClient();
         }

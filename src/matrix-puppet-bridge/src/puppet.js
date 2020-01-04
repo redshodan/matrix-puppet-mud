@@ -6,10 +6,17 @@ const writeFile = Promise.promisify(fs.writeFile);
 const read = Promise.promisify(require('read'));
 const whyPuppeting = 'https://github.com/kfatehi/matrix-appservice-imessage/commit/8a832051f79a94d7330be9e252eea78f76d774bc';
 
-const readConfigFile = (jsonFile) => {
-  return readFile(jsonFile).then(buffer => {
-    return JSON.parse(buffer);
-  });
+// const readConfigFile = (jsonFile) => {
+//   return readFile(jsonFile).then(buffer => {
+//     return JSON.parse(buffer);
+//   });
+// };
+
+const readConfigFile = (jsonFile, config) => {
+    return readFile(jsonFile).then(buffer => {
+        // return JSON.parse(buffer);
+        return config;
+    });
 };
 
 /**
@@ -21,8 +28,10 @@ class Puppet {
    *
    * @param {string} jsonFile path to JSON config file
    */
-  constructor(jsonFile) {
+    constructor(jsonFile, config, puppetCfg) {
     this.jsonFile = jsonFile;
+    this.config = config;
+    this.puppetCfg = puppetCfg;
     this.id = null;
     this.client = null;
     this.thirdPartyRooms = {};
@@ -35,12 +44,12 @@ class Puppet {
    * @returns {Promise} Returns a promise resolving the MatrixClient
    */
   startClient() {
-    return readConfigFile(this.jsonFile).then(config => {
-      this.id = config.puppet.id;
+      return readConfigFile(this.jsonFile, this.config).then(() => {
+          this.id = this.puppetCfg.id;
       return matrixSdk.createClient({
-        baseUrl: config.bridge.homeserverUrl,
-        userId: config.puppet.id,
-        accessToken: config.puppet.token
+          baseUrl: this.config.bridge.homeserverUrl,
+          userId: this.puppetCfg.id,
+          accessToken: this.puppetCfg.token
       });
     }).then(_matrixClient => {
       this.client = _matrixClient;
@@ -104,7 +113,7 @@ class Puppet {
    * @returns {Promise}
    */
   associate() {
-    return readConfigFile(this.jsonFile).then(config => {
+    return readConfigFile(this.jsonFile, this.config).then(config => {
       console.log([
         'This bridge performs matrix user puppeting.',
         'This means that the bridge logs in as your user and acts on your behalf',
@@ -112,13 +121,13 @@ class Puppet {
       ].join('\n'));
       console.log("Enter your user's localpart");
       return read({ silent: false }).then(localpart => {
-        let id = '@'+localpart+':'+config.bridge.domain;
+        let id = '@'+localpart+':'+this.config.bridge.domain;
         console.log("Enter password for "+id);
         return read({ silent: true, replace: '*' }).then(password => {
           return { localpart, id, password };
         });
       }).then(({localpart, id, password}) => {
-        let matrixClient = matrixSdk.createClient(config.bridge.homeserverUrl);
+        let matrixClient = matrixSdk.createClient(this.config.bridge.homeserverUrl);
         return matrixClient.loginWithPassword(id, password).then(accessDat => {
           console.log("log in success");
           return writeFile(this.jsonFile, JSON.stringify(Object.assign({}, config, {
