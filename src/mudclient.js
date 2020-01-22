@@ -44,6 +44,8 @@ class MUDClient extends EventEmitter {
         this.person_triggered_poses_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] ([\w ]+) (.*)$/;
         this.default_nospoof_rx = /^\[[^\]]\] (.*)$/;
         this.you_paged_rx = /^You paged (.*) with '/;
+        // TODO: this needs to be in config, not hard coded.
+        this.faz_url_rx = /^\[Fazool\(#8\),saypose\] Fazool says, "http:\/\/bit.ly\/.*/;
     }
 
     connect() {
@@ -73,6 +75,12 @@ class MUDClient extends EventEmitter {
             }
             // State: LOGGED_IN
             else if (this.state == State.LOGGED_IN) {
+                /// Action: Filters
+                if (this.faz_url_rx.test(line))
+                {
+                    this.log("Skipping predefined filters");
+                    return;
+                }
                 /// Action: self say
                 if (line.startsWith("You say, ") ||
                     this.you_paged_rx.test(line))
@@ -353,8 +361,7 @@ class MUDClient extends EventEmitter {
 
     send(msg, sender, isMe)
     {
-        if (msg.endsWith(this.dedup))
-            msg = msg.slice(0, msg.length - 2);
+        msg = utils.prepMatrixToMudMsg(msg);
         if (isMe)
         {
             if (msg.startsWith("@"))
@@ -369,8 +376,7 @@ class MUDClient extends EventEmitter {
 
     sendEmote(msg, sender, isMe)
     {
-        if (msg.endsWith(this.dedup))
-            msg = msg.slice(0, msg.length - 2);
+        msg = utils.prepMatrixToMudMsg(msg);
         if (isMe)
             this.socket.write(':' + msg + "\n");
         else
@@ -380,8 +386,7 @@ class MUDClient extends EventEmitter {
 
     sendPage(msg, recipient)
     {
-        if (msg.endsWith(this.dedup))
-            msg = msg.slice(0, msg.length - 2);
+        msg = utils.prepMatrixToMudMsg(msg);
         this.socket.write(`page ${recipient}="${msg}\n`);
         return Promise.resolve();
     }

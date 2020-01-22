@@ -34,6 +34,17 @@ function stripPose(line, mud_user)
     return line;
 }
 
+function prepMatrixToMudMsg(msg)
+{
+    if (msg.endsWith(this.dedup))
+        msg = msg.slice(0, msg.length - 2);
+    if (msg.indexOf("\n") >= 0)
+    {
+        msg = msg.replace(/\n/g, " // ");
+    }
+    return msg;
+}
+
 function escapeMsgBody(body)
 {
     let ret = body.replace(/</g, "&lt;");
@@ -52,3 +63,4 @@ module.exports.escapeMsgBody = escapeMsgBody;
 module.exports.matrixMud1on1Room = matrixMud1on1Room;
 module.exports.oneOnOneRoomToMudUser = oneOnOneRoomToMudUser;
 module.exports.stripPose = stripPose;
+module.exports.prepMatrixToMudMsg = prepMatrixToMudMsg;

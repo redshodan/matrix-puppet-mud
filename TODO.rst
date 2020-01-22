@@ -7,7 +7,8 @@
 - speaking/posing on direct MUX connection not being shown in bridge. You say matching is killing it
 - handle edited messages
 - handle replies
-- handle multi-line messages matrix->mud
+* handle multi-line messages matrix->mud
 - double hit on triggers when non-mainuser triggered.
-- filter Fazool saying bit.ly urls
+* filter Fazool saying bit.ly urls
 - triggered says don't have dbnum, so shows up as mud_baron user.
+- config file to spec extra filters/regexs. like for faz url shortening
