@@ -24,10 +24,20 @@ function oneOnOneRoomToMudUser(roomName, mudSender)
         return undefined;
 }
 
+function stripPose(line, mud_user)
+{
+    if (line.startsWith(mud_user)) {
+        line = line.slice(mud_user.length);
+        if (line.startsWith(" "))
+            line = line.slice(1);
+    }
+    return line;
+}
+
 function escapeMsgBody(body)
 {
-    let ret = body.replace("<", "&lt;");
-    ret = body.replace(">", "&gt;");
+    let ret = body.replace(/</g, "&lt;");
+    ret = body.replace(/>/g, "&gt;");
     return ret;
 }
 
@@ -41,3 +51,4 @@ module.exports.idMatrixToMud = idMatrixToMud;
 module.exports.escapeMsgBody = escapeMsgBody;
 module.exports.matrixMud1on1Room = matrixMud1on1Room;
 module.exports.oneOnOneRoomToMudUser = oneOnOneRoomToMudUser;
+module.exports.stripPose = stripPose;

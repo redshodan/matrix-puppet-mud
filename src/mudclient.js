@@ -28,6 +28,7 @@ class MUDClient extends EventEmitter {
         this.socket = null;
         this.state = State.CONNECTING;
         this.my_dbnum = null;
+        this.current_name = userCfg.mud.username;
         this.connect_rx = /.*connects you to an existing character\./;
         this.logged_in_rx = /^--__--LOGGED_IN--__--$/;
         this.person_speaks_rx = /^\[([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
@@ -98,6 +99,7 @@ class MUDClient extends EventEmitter {
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[5];
+                    // TODO short the body for the emote
                     this.sendMatrixMessage({
                         body:body, line:line, mud_user:mud_user,
                         mud_dbnum:mud_dbnum});
@@ -143,15 +145,19 @@ class MUDClient extends EventEmitter {
                     let mud_user = matches[1];
                     let mud_dbnum = matches[2];
                     let body = matches[3];
-                    let short = matches[3];
-                    if (short.startsWith(mud_user)) {
-                        short = short.slice(mud_user.length);
-                        if (short.startsWith(" "))
-                            short = short.slice(1);
-                    }
+                    // let short = matches[3];
+                    // if (short.startsWith(mud_user)) {
+                    //     short = short.slice(mud_user.length);
+                    //     if (short.startsWith(" "))
+                    //         short = short.slice(1);
+                    // }
+                    // this.sendMatrixMessage({
+                    //     body:short, line:body, msgtype:"m.emote",
+                    //     mud_user:mud_user, mud_dbnum:mud_dbnum});
                     this.sendMatrixMessage({
-                        body:short, line:body, msgtype:"m.emote",
-                        mud_user:mud_user, mud_dbnum:mud_dbnum});
+                        body:utils.stripPose(body, mud_user), line:body,
+                        msgtype:"m.emote", mud_user:mud_user,
+                        mud_dbnum:mud_dbnum});
                     return;
                 }
                 /// Action: <person> pose
@@ -260,14 +266,13 @@ class MUDClient extends EventEmitter {
     sendMatrixMessage({body=null, html=undefined, line=null, msgtype="m.text",
                        mud_user=null, mud_dbnum=null} = {})
     {
-        return this._sendMatrixMessage(utils.escapeMsgBody(body), html,
-                                       utils.escapeMsgBody(line),
+        return this._sendMatrixMessage(body, html, utils.escapeMsgBody(line),
                                        msgtype, mud_user, mud_dbnum);
     }
 
     _sendMatrixMessage(body, html, line, msgtype, mud_user, mud_dbnum)
     {
-        this.log(`_sendMatrixMessage:\n${body}\n${html}\n${line}\n${msgtype} ${mud_user} ${mud_dbnum}`);
+        this.log(`_sendMatrixMessage:\n--body:${body}\n--html:${html}\n--line:${line}\n--${msgtype} ${mud_user} ${mud_dbnum}`);
         mud_user = mud_user || this.muduser;
 
         if (!this.isMain && mud_user != this.muduser)
@@ -320,7 +325,7 @@ class MUDClient extends EventEmitter {
             senderId: canonical,
             receiverId: this.userCfg.puppet.id,
             avatarUrl: null,
-            text: utils.escapeMsgBody(body),
+            text: body,
             html: null,
             msgtype: msgtype
         });

@@ -33,7 +33,7 @@ class MUDController extends EventEmitter
                 this.mainClient = client;
             this.cliByMxId[ucfg.puppet.id] = client;
             this.cliByDBNum[ucfg.mud.dbnum] = client;
-            this.cliByMUDUser[ucfg.mud.username] = client;
+            this.cliByMUDUser[ucfg.mud.username.toLowerCase()] = client;
             this.mudNameByDBNum[ucfg.mud.dbnum] = ucfg.mud.username;
             client.connect();
 
@@ -67,7 +67,9 @@ class MUDController extends EventEmitter
             return [false, this.mainClient];
     }
 
-    getMudClientByMUDUser(mud_user) {
+    getMudClientByMUDUser(mud_user)
+    {
+        mud_user = mud_user.toLowerCase();
         if (mud_user in this.cliByMUDUser)
             return [true, this.cliByMUDUser[mud_user]];
         else
