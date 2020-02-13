@@ -40,7 +40,7 @@ class MUDClient extends EventEmitter {
         this.person_action_rx = /^\[([\w ]+)\(#(\d+)\)\] (.*)$/;
         this.person_forced_speaks_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]+)\(#(\d+)\),saypose\] (.*) says, \"(.*)\"$/;
         this.person_forced_poses_rx = /^\[([\w ]+)\(#(\d+)\)<-([\w ]?)\(#(\d+)\),saypose\] (.*)$/;
-        this.person_triggered_speaks_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] (.*) says, \"(.*)\"$/;
+        this.person_triggered_speaks_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] (.*) says,? \"(.*)\"$/;
         this.person_triggered_poses_rx = /^\[([\w ]+)\(#(\d+)\)\{[\w ]+\}\] ([\w ]+) (.*)$/;
         this.default_nospoof_rx = /^\[[^\]]\] (.*)$/;
         this.you_paged_rx = /^You paged (.*) with '/;

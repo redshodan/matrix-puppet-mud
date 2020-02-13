@@ -48,7 +48,7 @@ function prepMatrixToMudMsg(msg)
 function escapeMsgBody(body)
 {
     let ret = body.replace(/</g, "&lt;");
-    ret = body.replace(/>/g, "&gt;");
+    ret = ret.replace(/>/g, "&gt;");
     return ret;
 }
 

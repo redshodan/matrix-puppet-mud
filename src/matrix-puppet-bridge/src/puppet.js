@@ -28,13 +28,14 @@ class Puppet {
    *
    * @param {string} jsonFile path to JSON config file
    */
-    constructor(jsonFile, config, puppetCfg) {
+  constructor(jsonFile, config, puppetCfg) {
     this.jsonFile = jsonFile;
     this.config = config;
     this.puppetCfg = puppetCfg;
     this.id = null;
     this.client = null;
     this.thirdPartyRooms = {};
+    this.thirdPartyRoomsByMatrixId = {};
     this.app = null;
   }
 
@@ -152,6 +153,14 @@ class Puppet {
    */
   saveThirdPartyRoomId(matrixRoomId, thirdPartyRoomId) {
     this.thirdPartyRooms[matrixRoomId] = thirdPartyRoomId;
+    this.thirdPartyRoomsByMatrixId[thirdPartyRoomId] = matrixRoomId;
+  }
+
+  getMatrixRoomIdByThirdPartyRoomId(thirdPartyRoomId) {
+    if (thirdPartyRoomId in this.thirdPartyRoomsByMatrixId)
+      return this.thirdPartyRoomsByMatrixId[thirdPartyRoomId];
+    else
+      return null;
   }
 
   /**

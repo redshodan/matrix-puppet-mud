@@ -215,6 +215,9 @@ class Base {
     this.deduplicationTagPattern = this.config.deduplicationTagPattern || this.defaultDeduplicationTagPattern();
     this.deduplicationTagRegex = new RegExp(this.deduplicationTagPattern);
     this.bridge = bridge || this.setupBridge(config);
+
+    this.joinedBotToStatusRoom = false;
+
     info('initialized');
 
     this.puppet.setApp(this)
@@ -402,10 +405,13 @@ class Base {
       }
       let promiseList = [];
 
-      promiseList.push(() => {
-        info("joining protocol bot to room >>>", statusRoomId, "<<<");
-        botIntent.join(statusRoomId);
-      });
+      if (this.joinedBotToStatusRoom == false) {
+        this.joinedBotToStatusRoom = true;
+        promiseList.push(() => {
+          info("joining protocol bot to room >>>", statusRoomId, "<<<");
+          botIntent.join(statusRoomId);
+        });
+      }
 
       // AS Bots don't have display names? Weird...
       // PUT https://<REDACTED>/_matrix/client/r0/profile/%40hangoutsbot%3Aexample.org/displayname (AS) HTTP 404 Error: {"errcode":"M_UNKNOWN","error":"No row found"}
@@ -525,6 +531,12 @@ class Base {
     const { warn, info } = debug(this.getOrCreateMatrixRoomFromThirdPartyRoomId.name);
     puppet = puppet || this.puppet;
     info(`puppet: ${puppet}`);
+
+    let matrixRoomId = puppet.getMatrixRoomIdByThirdPartyRoomId(thirdPartyRoomId);
+    if (matrixRoomId != null) {
+      info(`Skipping room creation, using cached matrixid: ${matrixRoomId}`);
+      return Promise.resolve(matrixRoomId);
+    }
 
     const roomAlias = this.getRoomAliasFromThirdPartyRoomId(thirdPartyRoomId);
     const roomAliasName = this.getRoomAliasLocalPartFromThirdPartyRoomId(thirdPartyRoomId);
